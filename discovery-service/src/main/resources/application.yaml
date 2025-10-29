@@ -4,13 +4,18 @@ server:
 spring:
   application:
     name: discovery-service
+  cloud:
+    service-registry:
+      auto-registration:
+        enabled: false
 
 eureka:
+  instance:
+    hostname: localhost
   client:
-    register-with-eureka: false  # Le serveur ne s'enregistre pas lui-même
+    register-with-eureka: false
     fetch-registry: false
-  server:
-    enable-self-preservation: false  # Optionnel (pour éviter le mode sécurité en dev)
+
 
 management:
   endpoints:
