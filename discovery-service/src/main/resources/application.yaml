@@ -4,18 +4,18 @@ server:
 spring:
   application:
     name: discovery-service
+
   cloud:
     service-registry:
       auto-registration:
-        enabled: false
+        enabled: false  # d�sactive l'auto?enregistrement du serveur lui?m�me
 
 eureka:
   instance:
     hostname: localhost
-  client:
-    register-with-eureka: false
+              # d�sactive totalement le client Eureka c�t� serveur
+    register-with-eureka: false # le serveur ne s'enregistre pas lui-m�me
     fetch-registry: false
-
 
 management:
   endpoints:
