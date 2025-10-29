@@ -1,0 +1,19 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: discovery-service
+
+eureka:
+  client:
+    register-with-eureka: false  # Le serveur ne s'enregistre pas lui-même
+    fetch-registry: false
+  server:
+    enable-self-preservation: false  # Optionnel (pour éviter le mode sécurité en dev)
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
