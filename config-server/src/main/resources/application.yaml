@@ -1,0 +1,17 @@
+server:
+  port: 8888
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: file:///C:/PRJ/DOCTORAL_PROJECT_JEE_5eme/app-repo/Repo_Doctoral_Projet
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
