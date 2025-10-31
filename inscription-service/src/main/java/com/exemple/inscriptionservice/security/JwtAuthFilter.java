@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     public JwtAuthFilter(JwtService jwtService) {
         this.jwtService = jwtService;
@@ -40,6 +43,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
+                if (log.isDebugEnabled()) {
+                    log.debug("JWT OK for subject={}, path={}, roles={}", subject, request.getRequestURI(), authorities);
+                }
             } catch (Exception ignored) {}
         }
         filterChain.doFilter(request, response);
@@ -48,9 +54,38 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @SuppressWarnings("unchecked")
     private Collection<SimpleGrantedAuthority> extractAuthorities(Map<String,Object> claims) {
         Object rolesObj = claims.get("roles");
-        if (rolesObj instanceof List<?> list) {
-            return list.stream().map(String::valueOf).map(r -> new SimpleGrantedAuthority("ROLE_"+r)).collect(Collectors.toSet());
+        if (rolesObj == null) return List.of();
+
+        if (rolesObj instanceof Collection<?> col) {
+            return col.stream()
+                    .map(elem -> {
+                        if (elem instanceof Map<?,?> m) {
+                            Object name = m.get("name");
+                            return name != null ? String.valueOf(name) : String.valueOf(m);
+                        }
+                        return String.valueOf(elem);
+                    })
+                    .map(this::normalizeRole)
+                    .flatMap(r -> List.of(
+                            new SimpleGrantedAuthority("ROLE_" + r),
+                            new SimpleGrantedAuthority(r)
+                    ).stream())
+                    .collect(Collectors.toSet());
         }
-        return List.of();
+
+        String single = normalizeRole(String.valueOf(rolesObj));
+        return List.of(
+                new SimpleGrantedAuthority("ROLE_" + single),
+                new SimpleGrantedAuthority(single)
+        );
+    }
+
+    private String normalizeRole(String raw) {
+        if (raw == null) return "";
+        String s = raw.trim();
+        int dot = s.lastIndexOf('.');
+        if (dot >= 0 && dot < s.length()-1) s = s.substring(dot+1);
+        s = s.replaceAll("[^A-Za-z_]+", "");
+        return s.toUpperCase();
     }
 }
