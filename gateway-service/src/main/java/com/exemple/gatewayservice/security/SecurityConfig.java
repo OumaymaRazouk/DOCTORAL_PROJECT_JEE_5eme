@@ -10,8 +10,12 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
+
+    private ServerHttpSecurity http;
+
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        this.http = http;
         // Disable CSRF and allow all requests to pass through the gateway
         http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
