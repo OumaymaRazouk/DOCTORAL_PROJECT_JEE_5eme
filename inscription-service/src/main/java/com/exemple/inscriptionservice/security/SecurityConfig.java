@@ -28,7 +28,7 @@ public class SecurityConfig {
                         .requestMatchers("/public/**").permitAll()
                         // Temp: allow CORS preflight and creation endpoint to unblock 403
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/inscriptions", "/inscriptions/**").permitAll()
+                        .requestMatchers("/inscriptions", "/inscriptions/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/campaigns/**").permitAll()
                         .anyRequest().authenticated()
                 )

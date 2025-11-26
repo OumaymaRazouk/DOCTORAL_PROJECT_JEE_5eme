@@ -13,8 +13,14 @@ import com.exemple.inscriptionservice.repositories.CampaignRepository;
 import com.exemple.inscriptionservice.enums.CampaignType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,6 +32,9 @@ public class InscriptionService {
     private final UserClient userClient;
     private final InscriptionRepository repo;
     private final CampaignRepository campaigns;
+
+    @Value("${storage.base-path:#{systemProperties['user.home']}/doctoral-uploads}")
+    private String storageBasePath;
 
     public InscriptionService(UserClient userClient, InscriptionRepository repo, CampaignRepository campaigns) {
         this.userClient = userClient;
@@ -160,6 +169,35 @@ public class InscriptionService {
         return toDTO(i);
     }
 
+    public InscriptionDTO saveAttachments(String id, MultipartFile[] files) {
+        var i = repo.findById(id).orElseThrow();
+        Path dir = getInscriptionDir(id);
+        try {
+            Files.createDirectories(dir);
+            if (files != null) {
+                for (MultipartFile f : files) {
+                    if (f == null || f.isEmpty()) continue;
+                    String original = f.getOriginalFilename();
+                    String safeName = original == null ? ("file_" + System.currentTimeMillis()) : original.replaceAll("[^a-zA-Z0-9._-]", "_");
+                    int maxLen = 100;
+                    if (safeName.length() > maxLen) {
+                        int dot = safeName.lastIndexOf('.') > 0 ? safeName.lastIndexOf('.') : safeName.length();
+                        String base = safeName.substring(0, Math.min(dot, maxLen - 10));
+                        String ext = dot < safeName.length() ? safeName.substring(dot) : "";
+                        safeName = base + ext;
+                    }
+                    Path target = dir.resolve(System.currentTimeMillis() + "_" + safeName);
+                    Files.createDirectories(target.getParent());
+                    f.transferTo(target.toFile());
+                }
+            }
+        } catch (IOException e) {
+            log.error("Echec du televersement des pieces pour {}: {}", id, e.getMessage());
+            throw new RuntimeException("Echec du televersement des documents", e);
+        }
+        return toDTO(i);
+    }
+
     private void validateUser(UserResponse user, String requiredRole) {
         if (user == null) throw new RuntimeException("Utilisateur introuvable");
         // TODO: verifications de roles/statuts selon le modele reel
@@ -202,8 +240,21 @@ public class InscriptionService {
         }
     }
 
-    // TODO: brancher sur service de documents pour un vrai contrôle
     private boolean hasAllRequiredDocuments(String inscriptionId) {
-        return true;
+        try {
+            Path dir = getInscriptionDir(inscriptionId);
+            if (!Files.exists(dir)) return false;
+            try (var s = Files.list(dir)) {
+                return s.findAny().isPresent();
+            }
+        } catch (IOException e) {
+            log.warn("Controle pieces: erreur d'acces au repertoire pour {}: {}", inscriptionId, e.getMessage());
+            return false;
+        }
+    }
+
+    private Path getInscriptionDir(String id) {
+        Path base = Paths.get(storageBasePath);
+        return base.resolve(Paths.get("inscriptions", id));
     }
 }

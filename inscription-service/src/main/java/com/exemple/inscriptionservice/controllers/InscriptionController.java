@@ -3,10 +3,14 @@ package com.exemple.inscriptionservice.controllers;
 import com.exemple.inscriptionservice.dto.CreateInscriptionRequest;
 import com.exemple.inscriptionservice.dto.InscriptionDTO;
 import com.exemple.inscriptionservice.services.InscriptionService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.annotation.security.PermitAll;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -82,5 +86,11 @@ public class InscriptionController {
     @PostMapping("/{id}/reject")
     public ResponseEntity<InscriptionDTO> reject(@PathVariable String id) {
         return ResponseEntity.ok(service.reject(id));
+    }
+
+    @PermitAll
+    @PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<InscriptionDTO> uploadAttachments(@PathVariable String id, @RequestParam("files") MultipartFile[] files) {
+        return ResponseEntity.ok(service.saveAttachments(id, files));
     }
 }
