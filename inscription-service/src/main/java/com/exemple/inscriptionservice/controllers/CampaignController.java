@@ -17,7 +17,7 @@ public class CampaignController {
 
     public CampaignController(CampaignRepository repo) { this.repo = repo; }
 
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
     @PostMapping
     public ResponseEntity<Campaign> open(@RequestParam CampaignType type,
                                          @RequestParam String startDate,
@@ -31,7 +31,7 @@ public class CampaignController {
         return ResponseEntity.ok(repo.save(c));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
     @PostMapping("/{id}/close")
     public ResponseEntity<Campaign> close(@PathVariable String id) {
         var c = repo.findById(id).orElseThrow();

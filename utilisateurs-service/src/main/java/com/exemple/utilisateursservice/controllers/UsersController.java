@@ -39,15 +39,15 @@ public class UsersController {
 
     @GetMapping("/encadrants")
     public ResponseEntity<List<User>> listEncadrants() {
-        var encadrants = users.findAllByRole(Role.ENCADRANT);
-        return ResponseEntity.ok(encadrants);
+        var directeurs = users.findAllByRole(Role.DIRECTEUR);
+        return ResponseEntity.ok(directeurs);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
     @GetMapping("/admins")
     public ResponseEntity<List<User>> listAdmins() {
-        var admins = users.findAllByRole(Role.ADMIN);
-        var supers = users.findAllByRole(Role.SUPER_ADMIN);
+        var admins = users.findAllByRole(Role.PERSONNEL_ADMINISTRATIF);
+        var supers = users.findAllByRole(Role.SUPERADMIN);
         admins.addAll(supers);
         return ResponseEntity.ok(admins);
     }

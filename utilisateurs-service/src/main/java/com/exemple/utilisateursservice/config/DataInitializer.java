@@ -26,7 +26,7 @@ public class DataInitializer {
                         .lastName("Admin")
                         .email(email)
                         .password(encoder.encode(password))
-                        .roles(Set.of(Role.SUPER_ADMIN))
+                        .roles(Set.of(Role.SUPERADMIN))
                         .enabled(true)
                         .build();
                 users.save(u);

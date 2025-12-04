@@ -32,7 +32,8 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
+                        // Auth endpoints ouverts, que la route arrive en /auth/** ou /users/auth/** via le gateway
+                        .requestMatchers("/auth/**", "/users/auth/**").permitAll()
                         // Allow read-only user endpoints for inter-service calls
                         .requestMatchers(HttpMethod.GET, "/users/**").permitAll()
                         .anyRequest().authenticated()

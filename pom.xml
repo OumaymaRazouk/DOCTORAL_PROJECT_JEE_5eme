@@ -14,6 +14,7 @@
     <module>gateway-service</module>
     <module>utilisateurs-service</module>
     <module>inscription-service</module>
+    <module>notification-service</module>
   </modules>
 
 </project>

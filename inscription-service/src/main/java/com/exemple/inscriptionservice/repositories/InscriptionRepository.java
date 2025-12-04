@@ -10,5 +10,9 @@ public interface InscriptionRepository extends JpaRepository<Inscription, String
     List<Inscription> findAllByDoctorantIdOrderByCreatedAtDesc(String doctorantId);
     boolean existsByDoctorantIdAndAnneeAcademiqueAndType(String doctorantId, String anneeAcademique, com.exemple.inscriptionservice.enums.InscriptionType type);
     Optional<Inscription> findTopByDoctorantIdOrderByCreatedAtDesc(String doctorantId);
+    Optional<Inscription> findTopByDoctorantIdAndAnneeAcademiqueAndTypeOrderByCreatedAtDesc(
+            String doctorantId,
+            String anneeAcademique,
+            com.exemple.inscriptionservice.enums.InscriptionType type);
     long countByDoctorantIdAndTypeAndStatus(String doctorantId, com.exemple.inscriptionservice.enums.InscriptionType type, com.exemple.inscriptionservice.enums.InscriptionStatus status);
 }

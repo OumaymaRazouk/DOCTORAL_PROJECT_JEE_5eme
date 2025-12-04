@@ -40,6 +40,19 @@ public class Inscription {
     private String specialite;
     private String anneeAcademique;         // ex: 2025-2026
 
+    // Données personnelles liées au dossier d'inscription
+    private String nom;
+    private String cin;
+    private String telephone;
+    private String emailContact;
+    private String cne;
+    private String dateNaissance;
+    private String lieuNaissance;
+    private String nationalite;
+    private String adresse;
+    private String situationFamiliale;
+    private String resumeThese;
+
     // Métadonnées
     private LocalDate dateDemande;          // date de soumission
     private LocalDateTime createdAt;

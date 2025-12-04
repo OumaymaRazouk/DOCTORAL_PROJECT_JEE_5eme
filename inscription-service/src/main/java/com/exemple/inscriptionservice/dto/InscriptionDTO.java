@@ -21,6 +21,18 @@ public class InscriptionDTO {
     private String laboratoire;
     private String specialite;
     private String anneeAcademique;
+
+    private String nom;
+    private String cin;
+    private String telephone;
+    private String emailContact;
+    private String cne;
+    private String dateNaissance;
+    private String lieuNaissance;
+    private String nationalite;
+    private String adresse;
+    private String situationFamiliale;
+    private String resumeThese;
     private LocalDate dateDemande;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

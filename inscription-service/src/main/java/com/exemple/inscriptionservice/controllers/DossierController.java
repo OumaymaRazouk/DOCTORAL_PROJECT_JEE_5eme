@@ -24,7 +24,7 @@ public class DossierController {
     }
 
     // Exemple: action de validation par encadrant/administration
-    @PreAuthorize("hasAnyRole('ENCADRANT','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
     @PostMapping("/{id}/valider")
     public ResponseEntity<?> validerDossier(@PathVariable Long id, Authentication auth) {
         // Placeholder: brancher plus tard sur service/metier + DB

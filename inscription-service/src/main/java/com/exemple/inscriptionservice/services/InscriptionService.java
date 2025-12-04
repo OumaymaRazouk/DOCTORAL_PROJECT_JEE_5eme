@@ -14,14 +14,18 @@ import com.exemple.inscriptionservice.enums.CampaignType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,14 +36,25 @@ public class InscriptionService {
     private final UserClient userClient;
     private final InscriptionRepository repo;
     private final CampaignRepository campaigns;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${storage.base-path:#{systemProperties['user.home']}/doctoral-uploads}")
     private String storageBasePath;
 
-    public InscriptionService(UserClient userClient, InscriptionRepository repo, CampaignRepository campaigns) {
+    @Value("${app.notifications.topic:inscription-events}")
+    private String notificationsTopic;
+
+    public InscriptionService(UserClient userClient,
+                             InscriptionRepository repo,
+                             CampaignRepository campaigns,
+                             KafkaTemplate<String, String> kafkaTemplate,
+                             ObjectMapper objectMapper) {
         this.userClient = userClient;
         this.repo = repo;
         this.campaigns = campaigns;
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public InscriptionDTO createInscription(CreateInscriptionRequest request) {
@@ -54,13 +69,19 @@ public class InscriptionService {
         if (request.getAnneeAcademique() == null || request.getAnneeAcademique().isBlank())
             throw new IllegalArgumentException("Annee academique requise");
 
-        if (repo.existsByDoctorantIdAndAnneeAcademiqueAndType(request.getDoctorantId(), request.getAnneeAcademique(), InscriptionType.INSCRIPTION)) {
-            throw new IllegalStateException("Inscription deja existante pour cette annee");
+        var existing = repo.findTopByDoctorantIdAndAnneeAcademiqueAndTypeOrderByCreatedAtDesc(
+                request.getDoctorantId(),
+                request.getAnneeAcademique(),
+                InscriptionType.INSCRIPTION
+        ).orElse(null);
+        if (existing != null) {
+            log.info("Inscription deja existante pour cette annee, retour de l'existante id={}", existing.getId());
+            return toDTO(existing);
         }
 
         Inscription entity = Inscription.builder()
                 .type(InscriptionType.INSCRIPTION)
-                .status(InscriptionStatus.EN_ATTENTE_ADMIN)
+                .status(InscriptionStatus.BROUILLON)
                 .doctorantId(request.getDoctorantId())
                 .directeurId(request.getDirecteurId())
                 .coDirecteurId(request.getCoDirecteurId())
@@ -68,8 +89,20 @@ public class InscriptionService {
                 .laboratoire(request.getLaboratoire())
                 .specialite(request.getSpecialite())
                 .anneeAcademique(request.getAnneeAcademique())
+                .nom(request.getNom())
+                .cin(request.getCin())
+                .telephone(request.getTelephone())
+                .emailContact(request.getEmailContact())
+                .cne(request.getCne())
+                .dateNaissance(request.getDateNaissance())
+                .lieuNaissance(request.getLieuNaissance())
+                .nationalite(request.getNationalite())
+                .adresse(request.getAdresse())
+                .situationFamiliale(request.getSituationFamiliale())
+                .resumeThese(request.getResumeThese())
                 .build();
         entity = repo.save(entity);
+        publishEvent("INSCRIPTION_CREATED", entity);
         return toDTO(entity);
     }
 
@@ -95,7 +128,7 @@ public class InscriptionService {
 
         Inscription entity = Inscription.builder()
                 .type(InscriptionType.REINSCRIPTION)
-                .status(InscriptionStatus.EN_ATTENTE_ADMIN)
+                .status(InscriptionStatus.BROUILLON)
                 .doctorantId(request.getDoctorantId())
                 .directeurId(request.getDirecteurId())
                 .coDirecteurId(request.getCoDirecteurId())
@@ -103,9 +136,57 @@ public class InscriptionService {
                 .laboratoire(request.getLaboratoire())
                 .specialite(request.getSpecialite())
                 .anneeAcademique(request.getAnneeAcademique())
+                .nom(request.getNom())
+                .cin(request.getCin())
+                .telephone(request.getTelephone())
+                .emailContact(request.getEmailContact())
+                .cne(request.getCne())
+                .dateNaissance(request.getDateNaissance())
+                .lieuNaissance(request.getLieuNaissance())
+                .nationalite(request.getNationalite())
+                .adresse(request.getAdresse())
+                .situationFamiliale(request.getSituationFamiliale())
+                .resumeThese(request.getResumeThese())
                 .build();
         entity = repo.save(entity);
         return toDTO(entity);
+    }
+
+    public InscriptionDTO updateInscription(String id, CreateInscriptionRequest request) {
+        var i = repo.findById(id).orElseThrow();
+        if (i.getStatus() != InscriptionStatus.BROUILLON) {
+            throw new IllegalStateException("Seules les inscriptions en brouillon peuvent etre modifiees");
+        }
+
+        i.setDirecteurId(request.getDirecteurId());
+        i.setCoDirecteurId(request.getCoDirecteurId());
+        i.setSujetThese(request.getSujetThese());
+        i.setLaboratoire(request.getLaboratoire());
+        i.setSpecialite(request.getSpecialite());
+        i.setAnneeAcademique(request.getAnneeAcademique());
+        i.setNom(request.getNom());
+        i.setCin(request.getCin());
+        i.setTelephone(request.getTelephone());
+        i.setEmailContact(request.getEmailContact());
+        i.setCne(request.getCne());
+        i.setDateNaissance(request.getDateNaissance());
+        i.setLieuNaissance(request.getLieuNaissance());
+        i.setNationalite(request.getNationalite());
+        i.setAdresse(request.getAdresse());
+        i.setSituationFamiliale(request.getSituationFamiliale());
+        i.setResumeThese(request.getResumeThese());
+
+        i = repo.save(i);
+        return toDTO(i);
+    }
+
+    public void deleteInscription(String id) {
+        var i = repo.findById(id).orElseThrow();
+        if (i.getStatus() != InscriptionStatus.BROUILLON) {
+            throw new IllegalStateException("Seules les inscriptions en brouillon peuvent etre supprimees");
+        }
+        repo.delete(i);
+        publishEvent("INSCRIPTION_DELETED", i);
     }
 
     public InscriptionDTO getById(String id) {
@@ -138,15 +219,17 @@ public class InscriptionService {
 
     public InscriptionDTO submitToDirector(String id) {
         var i = repo.findById(id).orElseThrow();
-        i.setStatus(InscriptionStatus.EN_ATTENTE_ADMIN);
+        i.setStatus(InscriptionStatus.EN_ATTENTE_DIRECTEUR);
         i = repo.save(i);
+        publishEvent("INSCRIPTION_SUBMITTED", i);
         return toDTO(i);
     }
 
     public InscriptionDTO approveByDirector(String id) {
         var i = repo.findById(id).orElseThrow();
-        i.setStatus(InscriptionStatus.VALIDE);
+        i.setStatus(InscriptionStatus.EN_ATTENTE_ADMIN);
         i = repo.save(i);
+        publishEvent("INSCRIPTION_DIRECTOR_APPROVED", i);
         return toDTO(i);
     }
 
@@ -156,9 +239,10 @@ public class InscriptionService {
         if (!hasAllRequiredDocuments(i.getId())) {
             throw new IllegalStateException("Documents requis manquants ou non conformes");
         }
-        // Après validation administrative, passer à la validation scientifique (directeur)
-        i.setStatus(InscriptionStatus.EN_ATTENTE_DIRECTEUR);
+        // Validation finale administrative
+        i.setStatus(InscriptionStatus.VALIDE);
         i = repo.save(i);
+        publishEvent("INSCRIPTION_ADMIN_APPROVED", i);
         return toDTO(i);
     }
 
@@ -166,36 +250,45 @@ public class InscriptionService {
         var i = repo.findById(id).orElseThrow();
         i.setStatus(InscriptionStatus.REJETE);
         i = repo.save(i);
+        publishEvent("INSCRIPTION_REJECTED", i);
         return toDTO(i);
     }
 
-    public InscriptionDTO saveAttachments(String id, MultipartFile[] files) {
+    public InscriptionDTO saveAttachments(String id,
+                                          MultipartFile diplome,
+                                          MultipartFile cv,
+                                          MultipartFile lettreMotivation,
+                                          MultipartFile cin) {
         var i = repo.findById(id).orElseThrow();
         Path dir = getInscriptionDir(id);
         try {
             Files.createDirectories(dir);
-            if (files != null) {
-                for (MultipartFile f : files) {
-                    if (f == null || f.isEmpty()) continue;
-                    String original = f.getOriginalFilename();
-                    String safeName = original == null ? ("file_" + System.currentTimeMillis()) : original.replaceAll("[^a-zA-Z0-9._-]", "_");
-                    int maxLen = 100;
-                    if (safeName.length() > maxLen) {
-                        int dot = safeName.lastIndexOf('.') > 0 ? safeName.lastIndexOf('.') : safeName.length();
-                        String base = safeName.substring(0, Math.min(dot, maxLen - 10));
-                        String ext = dot < safeName.length() ? safeName.substring(dot) : "";
-                        safeName = base + ext;
-                    }
-                    Path target = dir.resolve(System.currentTimeMillis() + "_" + safeName);
-                    Files.createDirectories(target.getParent());
-                    f.transferTo(target.toFile());
-                }
-            }
+            saveOneAttachment(dir, diplome, "diplome");
+            saveOneAttachment(dir, cv, "cv");
+            saveOneAttachment(dir, lettreMotivation, "lettre_motivation");
+            saveOneAttachment(dir, cin, "cin");
         } catch (IOException e) {
             log.error("Echec du televersement des pieces pour {}: {}", id, e.getMessage());
             throw new RuntimeException("Echec du televersement des documents", e);
         }
+        publishEvent("INSCRIPTION_DOCUMENTS_UPLOADED", i);
         return toDTO(i);
+    }
+
+    private void saveOneAttachment(Path dir, MultipartFile file, String prefix) throws IOException {
+        if (file == null || file.isEmpty()) return;
+        String original = file.getOriginalFilename();
+        String safeName = original == null ? (prefix + "_" + System.currentTimeMillis()) : original.replaceAll("[^a-zA-Z0-9._-]", "_");
+        int maxLen = 100;
+        if (safeName.length() > maxLen) {
+            int dot = safeName.lastIndexOf('.') > 0 ? safeName.lastIndexOf('.') : safeName.length();
+            String base = safeName.substring(0, Math.min(dot, maxLen - 10));
+            String ext = dot < safeName.length() ? safeName.substring(dot) : "";
+            safeName = base + ext;
+        }
+        Path target = dir.resolve(prefix + "_" + System.currentTimeMillis() + "_" + safeName);
+        Files.createDirectories(target.getParent());
+        file.transferTo(target.toFile());
     }
 
     private void validateUser(UserResponse user, String requiredRole) {
@@ -227,6 +320,17 @@ public class InscriptionService {
                 .laboratoire(i.getLaboratoire())
                 .specialite(i.getSpecialite())
                 .anneeAcademique(i.getAnneeAcademique())
+                .nom(i.getNom())
+                .cin(i.getCin())
+                .telephone(i.getTelephone())
+                .emailContact(i.getEmailContact())
+                .cne(i.getCne())
+                .dateNaissance(i.getDateNaissance())
+                .lieuNaissance(i.getLieuNaissance())
+                .nationalite(i.getNationalite())
+                .adresse(i.getAdresse())
+                .situationFamiliale(i.getSituationFamiliale())
+                .resumeThese(i.getResumeThese())
                 .dateDemande(i.getDateDemande())
                 .createdAt(i.getCreatedAt())
                 .updatedAt(i.getUpdatedAt())
@@ -250,6 +354,27 @@ public class InscriptionService {
         } catch (IOException e) {
             log.warn("Controle pieces: erreur d'acces au repertoire pour {}: {}", inscriptionId, e.getMessage());
             return false;
+        }
+    }
+
+    private void publishEvent(String type, Inscription i) {
+        if (i == null) return;
+        try {
+            Map<String, Object> payload = Map.of(
+                    "eventType", type,
+                    "inscriptionId", i.getId(),
+                    "doctorantId", i.getDoctorantId(),
+                    "directeurId", i.getDirecteurId(),
+                    "status", String.valueOf(i.getStatus()),
+                    "timestamp", System.currentTimeMillis()
+            );
+            String json = objectMapper.writeValueAsString(payload);
+            kafkaTemplate.send(notificationsTopic, i.getId(), json);
+            if (log.isDebugEnabled()) {
+                log.debug("Evenement Kafka publie: topic={}, key={}, type={}", notificationsTopic, i.getId(), type);
+            }
+        } catch (Exception e) {
+            log.warn("Echec envoi evenement Kafka {} pour inscription {}: {}", type, i.getId(), e.getMessage());
         }
     }
 
