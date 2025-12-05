@@ -53,6 +53,9 @@ public class Inscription {
     private String situationFamiliale;
     private String resumeThese;
 
+    // Motif de rejet éventuel (directeur ou administration)
+    private String motifRejet;
+
     // Métadonnées
     private LocalDate dateDemande;          // date de soumission
     private LocalDateTime createdAt;

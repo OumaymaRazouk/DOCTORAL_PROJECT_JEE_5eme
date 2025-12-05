@@ -33,6 +33,7 @@ public class InscriptionDTO {
     private String adresse;
     private String situationFamiliale;
     private String resumeThese;
+    private String motifRejet;
     private LocalDate dateDemande;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

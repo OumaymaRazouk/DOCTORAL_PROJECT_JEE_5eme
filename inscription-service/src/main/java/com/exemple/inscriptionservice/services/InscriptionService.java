@@ -125,6 +125,11 @@ public class InscriptionService {
         if (reinscriptionsValidees >= 3) {
             throw new IllegalStateException("Limite de 3 ans de réinscription atteinte (sans dérogation)");
         }
+        // règle complémentaire CdC: alerte/limite durée totale du doctorat (> 6 ans depuis première inscription)
+        long dureeSimulee = 1L + reinscriptionsValidees; // 1 année pour l'inscription initiale + réinscriptions validées
+        if (dureeSimulee >= 6) {
+            log.warn("Alerte duree doctorat >=6 ans (simule) pour doctorant {}", request.getDoctorantId());
+        }
 
         Inscription entity = Inscription.builder()
                 .type(InscriptionType.REINSCRIPTION)
@@ -198,6 +203,16 @@ public class InscriptionService {
                 .stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    public List<InscriptionDTO> listByDirecteur(String directeurId) {
+        return repo.findAllByDirecteurIdOrderByCreatedAtDesc(directeurId)
+                .stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    public List<InscriptionDTO> listPendingForAdmin() {
+        return repo.findAllByStatusOrderByCreatedAtDesc(InscriptionStatus.EN_ATTENTE_ADMIN)
+                .stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
     public InscriptionDTO prefillFromLastYear(String doctorantId, String nouvelleAnnee) {
         var last = repo.findTopByDoctorantIdOrderByCreatedAtDesc(doctorantId)
                 .orElse(null);
@@ -246,9 +261,10 @@ public class InscriptionService {
         return toDTO(i);
     }
 
-    public InscriptionDTO reject(String id) {
+    public InscriptionDTO reject(String id, String motif) {
         var i = repo.findById(id).orElseThrow();
         i.setStatus(InscriptionStatus.REJETE);
+        i.setMotifRejet(motif);
         i = repo.save(i);
         publishEvent("INSCRIPTION_REJECTED", i);
         return toDTO(i);
@@ -331,6 +347,7 @@ public class InscriptionService {
                 .adresse(i.getAdresse())
                 .situationFamiliale(i.getSituationFamiliale())
                 .resumeThese(i.getResumeThese())
+                .motifRejet(i.getMotifRejet())
                 .dateDemande(i.getDateDemande())
                 .createdAt(i.getCreatedAt())
                 .updatedAt(i.getUpdatedAt())

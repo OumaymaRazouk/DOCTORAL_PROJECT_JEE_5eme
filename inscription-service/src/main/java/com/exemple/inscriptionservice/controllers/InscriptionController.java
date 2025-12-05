@@ -75,6 +75,20 @@ public class InscriptionController {
         return ResponseEntity.ok(service.listByDoctorant(doctorantId));
     }
 
+    // Liste des demandes pour un directeur de thèse (tous les dossiers qu'il encadre)
+    @PermitAll
+    @GetMapping("/directeurs/{directeurId}")
+    public ResponseEntity<List<InscriptionDTO>> listByDirecteur(@PathVariable String directeurId) {
+        return ResponseEntity.ok(service.listByDirecteur(directeurId));
+    }
+
+    // Liste des demandes en attente de validation administrative
+    @PreAuthorize("hasAnyAuthority('PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @GetMapping("/admin/en-attente")
+    public ResponseEntity<List<InscriptionDTO>> listPendingForAdmin() {
+        return ResponseEntity.ok(service.listPendingForAdmin());
+    }
+
     // Soumission au directeur de thèse
     @PreAuthorize("hasAnyAuthority('DOCTORANT','SUPERADMIN')")
     @PostMapping("/{id}/submit")
@@ -99,8 +113,8 @@ public class InscriptionController {
     // Rejet (par directeur ou personnel administratif)
     @PreAuthorize("hasAnyAuthority('DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
     @PostMapping("/{id}/reject")
-    public ResponseEntity<InscriptionDTO> reject(@PathVariable String id) {
-        return ResponseEntity.ok(service.reject(id));
+    public ResponseEntity<InscriptionDTO> reject(@PathVariable String id, @RequestParam(required = false) String motif) {
+        return ResponseEntity.ok(service.reject(id, motif));
     }
 
     @PermitAll
