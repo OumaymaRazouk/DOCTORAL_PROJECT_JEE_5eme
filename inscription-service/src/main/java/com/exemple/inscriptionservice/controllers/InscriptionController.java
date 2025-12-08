@@ -3,6 +3,8 @@ package com.exemple.inscriptionservice.controllers;
 import com.exemple.inscriptionservice.dto.CreateInscriptionRequest;
 import com.exemple.inscriptionservice.dto.InscriptionDTO;
 import com.exemple.inscriptionservice.services.InscriptionService;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -126,5 +128,24 @@ public class InscriptionController {
             @RequestParam(value = "lettreMotivation", required = false) MultipartFile lettreMotivation,
             @RequestParam(value = "cin", required = false) MultipartFile cin) {
         return ResponseEntity.ok(service.saveAttachments(id, diplome, cv, lettreMotivation, cin));
+    }
+
+    @PreAuthorize("hasAnyAuthority('DOCTORANT','DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @GetMapping("/{id}/attachments")
+    public ResponseEntity<List<String>> listAttachments(@PathVariable String id) {
+        return ResponseEntity.ok(service.listAttachments(id));
+    }
+
+    @PreAuthorize("hasAnyAuthority('DOCTORANT','DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @GetMapping("/{id}/attachments/{fileName}")
+    public ResponseEntity<Resource> downloadAttachment(@PathVariable String id, @PathVariable String fileName) {
+        Resource resource = service.loadAttachment(id, fileName);
+        if (resource == null || !resource.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 }

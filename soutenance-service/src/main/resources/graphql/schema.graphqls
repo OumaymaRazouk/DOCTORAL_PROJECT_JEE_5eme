@@ -1,0 +1,117 @@
+enum SoutenanceStatus {
+  BROUILLON
+  SOUMIS
+  PREREQUIS_EN_VERIFICATION
+  PREREQUIS_VALIDES
+  JURY_PROPOSE
+  JURY_VALIDE
+  SOUTENANCE_AUTORISEE
+  SOUTENANCE_PLANIFIEE
+  SOUTENANCE_EFFECTUEE
+  REJETE
+}
+
+enum JuryRole {
+  RAPPORTEUR
+  EXAMINATEUR
+  PRESIDENT
+  INVITE
+}
+
+type JuryMember {
+  id: ID!
+  nom: String!
+  prenom: String!
+  affiliation: String!
+  email: String!
+  telephone: String
+  role: JuryRole!
+}
+
+type Soutenance {
+  id: ID!
+  doctorantId: ID!
+  directeurId: ID!
+  status: SoutenanceStatus!
+
+  titreTheseDefinitif: String
+  resumeFinal: String
+  motsCles: [String!]
+
+  publicationsCount: Int!
+  communicationsCount: Int!
+  heuresFormationCumulees: Int!
+  dureeDoctoratAnnees: Int!
+
+  manuscritPath: String
+  rapportThesePath: String
+  rapportAntiPlagiatPath: String
+  preuvesPublicationsPath: String
+  preuvesCommunicationsPath: String
+  attestationsFormationsPath: String
+  demandeManuscritePath: String
+
+  commentairePrerequis: String
+  commentaireJury: String
+  motifRejet: String
+
+  dateSoumission: String
+  dateAutorisation: String
+  datePlanifiee: String
+  salle: String
+  lieu: String
+  lienVisioconference: String
+
+  jury: [JuryMember!]!
+}
+
+input SoutenanceDraftInput {
+  doctorantId: ID!
+  directeurId: ID!
+  titreTheseDefinitif: String!
+  resumeFinal: String!
+  motsCles: [String!]!
+  publicationsCount: Int!
+  communicationsCount: Int!
+  heuresFormationCumulees: Int!
+  dureeDoctoratAnnees: Int!
+}
+
+input JuryMemberInput {
+  nom: String!
+  prenom: String!
+  affiliation: String!
+  email: String!
+  telephone: String
+  role: JuryRole!
+}
+
+input PlanificationInput {
+  dateHeure: String!
+  salle: String!
+  lieu: String!
+  lienVisioconference: String
+}
+
+type Query {
+  soutenanceById(id: ID!): Soutenance
+  soutenancesForDoctorant(doctorantId: ID!): [Soutenance!]!
+  soutenancesForDirecteur(directeurId: ID!): [Soutenance!]!
+  soutenancesForAdmin(status: SoutenanceStatus): [Soutenance!]!
+}
+
+type Mutation {
+  saveSoutenanceDraft(input: SoutenanceDraftInput!): Soutenance!
+  submitSoutenance(id: ID!): Soutenance!
+
+  adminMarkPrerequisUnderReview(id: ID!): Soutenance!
+  adminValidatePrerequis(id: ID!, commentaire: String): Soutenance!
+  adminRejectSoutenance(id: ID!, motif: String!): Soutenance!
+
+  directeurProposeJury(id: ID!, membres: [JuryMemberInput!]!): Soutenance!
+  adminValidateJury(id: ID!, commentaire: String): Soutenance!
+
+  adminAuthorizeSoutenance(id: ID!): Soutenance!
+  adminPlanifySoutenance(id: ID!, input: PlanificationInput!): Soutenance!
+  adminMarkSoutenanceDone(id: ID!, dateEffective: String): Soutenance!
+}

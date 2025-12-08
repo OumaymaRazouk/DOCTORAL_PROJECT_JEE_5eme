@@ -53,6 +53,11 @@ public class Inscription {
     private String situationFamiliale;
     private String resumeThese;
 
+    private String rapportAvancement;
+    private String publicationsN1;
+    private String communicationsN1;
+    private String heuresFormationCumulees;
+
     // Motif de rejet éventuel (directeur ou administration)
     private String motifRejet;
 

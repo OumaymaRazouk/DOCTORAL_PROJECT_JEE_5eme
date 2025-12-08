@@ -15,6 +15,7 @@
     <module>utilisateurs-service</module>
     <module>inscription-service</module>
     <module>notification-service</module>
+    <module>soutenance-service</module>
   </modules>
 
 </project>
