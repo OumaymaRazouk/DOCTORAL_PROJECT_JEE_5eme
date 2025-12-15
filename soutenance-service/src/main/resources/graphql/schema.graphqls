@@ -6,6 +6,7 @@ enum SoutenanceStatus {
   JURY_PROPOSE
   JURY_VALIDE
   SOUTENANCE_AUTORISEE
+  PLANIFICATION_PROPOSEE
   SOUTENANCE_PLANIFIEE
   SOUTENANCE_EFFECTUEE
   REJETE
@@ -98,6 +99,7 @@ type Query {
   soutenancesForDoctorant(doctorantId: ID!): [Soutenance!]!
   soutenancesForDirecteur(directeurId: ID!): [Soutenance!]!
   soutenancesForAdmin(status: SoutenanceStatus): [Soutenance!]!
+  juryForSoutenance(soutenanceId: String!): [JuryMember!]!
 }
 
 type Mutation {
@@ -112,6 +114,11 @@ type Mutation {
   adminValidateJury(id: ID!, commentaire: String): Soutenance!
 
   adminAuthorizeSoutenance(id: ID!): Soutenance!
+  directeurProposePlanification(id: ID!, input: PlanificationInput!): Soutenance!
   adminPlanifySoutenance(id: ID!, input: PlanificationInput!): Soutenance!
   adminMarkSoutenanceDone(id: ID!, dateEffective: String): Soutenance!
+}
+
+type Subscription {
+  soutenanceUpdated(id: ID!): Soutenance!
 }

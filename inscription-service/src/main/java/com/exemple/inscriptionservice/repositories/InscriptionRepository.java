@@ -19,4 +19,5 @@ public interface InscriptionRepository extends JpaRepository<Inscription, String
     List<Inscription> findAllByDirecteurIdAndStatusOrderByCreatedAtDesc(String directeurId, com.exemple.inscriptionservice.enums.InscriptionStatus status);
     List<Inscription> findAllByStatusOrderByCreatedAtDesc(com.exemple.inscriptionservice.enums.InscriptionStatus status);
     long countByDoctorantIdAndTypeAndStatus(String doctorantId, com.exemple.inscriptionservice.enums.InscriptionType type, com.exemple.inscriptionservice.enums.InscriptionStatus status);
+    List<Inscription> findAllByOrderByCreatedAtDesc();
 }

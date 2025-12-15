@@ -16,6 +16,8 @@
     <module>inscription-service</module>
     <module>notification-service</module>
     <module>soutenance-service</module>
+    <module>inscription-stat-soap-service</module>
+    <module>soutenance-stat-grpc-service</module>
   </modules>
 
 </project>

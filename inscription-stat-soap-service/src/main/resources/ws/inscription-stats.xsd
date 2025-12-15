@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://exemple.com/inscriptionstats"
+           xmlns="http://exemple.com/inscriptionstats"
+           elementFormDefault="qualified">
+
+    <xs:element name="GetInscriptionsParAnneeRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="anneeAcademique" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="GetInscriptionsParAnneeResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="summary" type="InscriptionYearSummary" maxOccurs="unbounded" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="InscriptionYearSummary">
+        <xs:sequence>
+            <xs:element name="anneeAcademique" type="xs:string"/>
+            <xs:element name="total" type="xs:long"/>
+            <xs:element name="inscription" type="InscriptionView" maxOccurs="unbounded" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="InscriptionView">
+        <xs:sequence>
+            <xs:element name="id" type="xs:string"/>
+            <xs:element name="type" type="xs:string" minOccurs="0"/>
+            <xs:element name="status" type="xs:string" minOccurs="0"/>
+            <xs:element name="doctorantId" type="xs:string" minOccurs="0"/>
+            <xs:element name="directeurId" type="xs:string" minOccurs="0"/>
+            <xs:element name="sujetThese" type="xs:string" minOccurs="0"/>
+            <xs:element name="laboratoire" type="xs:string" minOccurs="0"/>
+            <xs:element name="specialite" type="xs:string" minOccurs="0"/>
+            <xs:element name="anneeAcademique" type="xs:string" minOccurs="0"/>
+            <xs:element name="nom" type="xs:string" minOccurs="0"/>
+            <xs:element name="emailContact" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+</xs:schema>

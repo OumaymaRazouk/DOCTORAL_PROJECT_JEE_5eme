@@ -227,6 +227,11 @@ public class InscriptionService {
                 .stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    public List<InscriptionDTO> listAll() {
+        return repo.findAllByOrderByCreatedAtDesc()
+                .stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
     public InscriptionDTO prefillFromLastYear(String doctorantId, String nouvelleAnnee) {
         var last = repo.findTopByDoctorantIdOrderByCreatedAtDesc(doctorantId)
                 .orElse(null);

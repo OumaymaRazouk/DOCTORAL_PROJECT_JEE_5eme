@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.exemple.soutenancestatgrpcservice.grpc";
+
+service SoutenanceStatService {
+  rpc GetWeeklySoutenanceStats(WeeklyStatsRequest) returns (WeeklyStatsResponse);
+  rpc StreamWeeklySoutenanceStats(WeeklyStatsRequest) returns (stream WeeklyWeekStats);
+}
+
+message WeeklyStatsRequest {
+  string start_date = 1;
+  string end_date = 2;
+  bool include_details = 3;
+}
+
+message WeeklyStatsResponse {
+  repeated WeeklyWeekStats weeks = 1;
+}
+
+message WeeklyWeekStats {
+  string week_start = 1;
+  string week_end = 2;
+  int64 total = 3;
+  repeated SoutenanceDetail soutenances = 4;
+}
+
+message SoutenanceDetail {
+  string id = 1;
+  string doctorant_id = 2;
+  string directeur_id = 3;
+  string status = 4;
+  string titre_these_definitif = 5;
+  string date_planifiee = 6;
+  string salle = 7;
+  string lieu = 8;
+  repeated JuryMemberDetail jury = 9;
+}
+
+message JuryMemberDetail {
+  string nom = 1;
+  string prenom = 2;
+  string affiliation = 3;
+  string role = 4;
+}

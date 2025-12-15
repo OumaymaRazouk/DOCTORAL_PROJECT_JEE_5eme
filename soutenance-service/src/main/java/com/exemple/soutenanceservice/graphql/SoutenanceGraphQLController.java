@@ -9,12 +9,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
 import org.springframework.stereotype.Controller;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.List;
+import reactor.core.publisher.Flux;
 
 @Controller
 @RequiredArgsConstructor
@@ -84,6 +86,11 @@ public class SoutenanceGraphQLController {
     }
 
     @MutationMapping
+    public Soutenance directeurProposePlanification(@Argument String id, @Argument PlanificationInput input) {
+        return domainService.directeurProposePlanification(id, input);
+    }
+
+    @MutationMapping
     public Soutenance adminPlanifySoutenance(@Argument String id, @Argument PlanificationInput input) {
         return domainService.adminPlanifieSoutenance(id, input);
     }
@@ -105,5 +112,12 @@ public class SoutenanceGraphQLController {
     public List<JuryMember> juryForSoutenance(@Argument String soutenanceId) {
         if (soutenanceId == null) return Collections.emptyList();
         return juryMemberRepository.findAllBySoutenance_Id(soutenanceId);
+    }
+
+    @SubscriptionMapping
+    public Flux<Soutenance> soutenanceUpdated(@Argument String id) {
+        Soutenance current = domainService.getById(id);
+        Flux<Soutenance> initial = current != null ? Flux.just(current) : Flux.empty();
+        return initial.concatWith(domainService.soutenanceUpdates(id));
     }
 }

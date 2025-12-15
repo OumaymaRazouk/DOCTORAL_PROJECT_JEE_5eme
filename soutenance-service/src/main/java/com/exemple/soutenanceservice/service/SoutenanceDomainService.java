@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +23,9 @@ public class SoutenanceDomainService {
 
     private final SoutenanceRepository soutenanceRepository;
     private final JuryMemberRepository juryMemberRepository;
+
+    private final Sinks.Many<Soutenance> soutenanceSink =
+            Sinks.many().multicast().onBackpressureBuffer();
 
     public List<Soutenance> listForDoctorant(String doctorantId) {
         return soutenanceRepository.findAllByDoctorantIdOrderByCreatedAtDesc(doctorantId);
@@ -48,7 +53,7 @@ public class SoutenanceDomainService {
         if (existing != null && existing.getStatus() == SoutenanceStatus.BROUILLON) {
             // Mise à jour du brouillon existant
             applyDraftFields(existing, input);
-            return soutenanceRepository.save(existing);
+            return saveAndEmit(existing);
         }
         Soutenance s = Soutenance.builder()
                 .doctorantId(input.getDoctorantId())
@@ -56,7 +61,7 @@ public class SoutenanceDomainService {
                 .status(SoutenanceStatus.BROUILLON)
                 .build();
         applyDraftFields(s, input);
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
     }
 
     private void applyDraftFields(Soutenance s, SoutenanceDraftInput input) {
@@ -83,7 +88,7 @@ public class SoutenanceDomainService {
         }
         s.setStatus(SoutenanceStatus.SOUMIS);
         s.setDateSoumission(LocalDateTime.now());
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
     }
 
     private String checkPrerequis(Soutenance s) {
@@ -111,7 +116,7 @@ public class SoutenanceDomainService {
         }
         s.setStatus(SoutenanceStatus.PREREQUIS_VALIDES);
         s.setCommentairePrerequis(commentaire);
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
     }
 
     @Transactional
@@ -121,7 +126,7 @@ public class SoutenanceDomainService {
             throw new IllegalStateException("Vérification des prérequis uniquement après soumission");
         }
         s.setStatus(SoutenanceStatus.PREREQUIS_EN_VERIFICATION);
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
     }
 
     @Transactional
@@ -129,14 +134,16 @@ public class SoutenanceDomainService {
         Soutenance s = soutenanceRepository.findById(id).orElseThrow();
         s.setStatus(SoutenanceStatus.REJETE);
         s.setMotifRejet(motif);
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
     }
 
     @Transactional
     public Soutenance directeurProposeJury(String id, List<JuryMemberInput> membres) {
         Soutenance s = soutenanceRepository.findById(id).orElseThrow();
-        if (s.getStatus() != SoutenanceStatus.PREREQUIS_VALIDES) {
-            throw new IllegalStateException("Le jury ne peut être proposé que après validation des prérequis");
+        if (s.getStatus() != SoutenanceStatus.PREREQUIS_VALIDES
+                && s.getStatus() != SoutenanceStatus.JURY_PROPOSE
+                && s.getStatus() != SoutenanceStatus.JURY_VALIDE) {
+            throw new IllegalStateException("Le jury ne peut être proposé ou modifié que après validation des prérequis");
         }
         // supprimer l'ancien jury
         juryMemberRepository.deleteAllBySoutenance_Id(id);
@@ -160,7 +167,7 @@ public class SoutenanceDomainService {
             throw new IllegalStateException("Le jury doit contenir au moins 2 rapporteurs et 1 président");
         }
         s.setStatus(SoutenanceStatus.JURY_PROPOSE);
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
     }
 
     @Transactional
@@ -171,7 +178,7 @@ public class SoutenanceDomainService {
         }
         s.setStatus(SoutenanceStatus.JURY_VALIDE);
         s.setCommentaireJury(commentaire);
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
     }
 
     @Transactional
@@ -182,21 +189,37 @@ public class SoutenanceDomainService {
         }
         s.setStatus(SoutenanceStatus.SOUTENANCE_AUTORISEE);
         s.setDateAutorisation(LocalDateTime.now());
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
+    }
+
+    @Transactional
+    public Soutenance directeurProposePlanification(String id, PlanificationInput input) {
+        Soutenance s = soutenanceRepository.findById(id).orElseThrow();
+        if (s.getStatus() != SoutenanceStatus.SOUTENANCE_AUTORISEE
+                && s.getStatus() != SoutenanceStatus.PLANIFICATION_PROPOSEE) {
+            throw new IllegalStateException("La soutenance doit être autorisée avant que le directeur ne propose une planification");
+        }
+        s.setDatePlanifiee(input.getDateHeure());
+        s.setSalle(input.getSalle());
+        s.setLieu(input.getLieu());
+        s.setLienVisioconference(input.getLienVisioconference());
+        s.setStatus(SoutenanceStatus.PLANIFICATION_PROPOSEE);
+        return saveAndEmit(s);
     }
 
     @Transactional
     public Soutenance adminPlanifieSoutenance(String id, PlanificationInput input) {
         Soutenance s = soutenanceRepository.findById(id).orElseThrow();
-        if (s.getStatus() != SoutenanceStatus.SOUTENANCE_AUTORISEE) {
-            throw new IllegalStateException("La soutenance doit être autorisée avant planification");
+        if (s.getStatus() != SoutenanceStatus.SOUTENANCE_AUTORISEE
+                && s.getStatus() != SoutenanceStatus.PLANIFICATION_PROPOSEE) {
+            throw new IllegalStateException("La soutenance doit être autorisée ou une planification proposée avant validation de la planification");
         }
         s.setDatePlanifiee(input.getDateHeure());
         s.setSalle(input.getSalle());
         s.setLieu(input.getLieu());
         s.setLienVisioconference(input.getLienVisioconference());
         s.setStatus(SoutenanceStatus.SOUTENANCE_PLANIFIEE);
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
     }
 
     @Transactional
@@ -209,6 +232,17 @@ public class SoutenanceDomainService {
             s.setDatePlanifiee(dateEffective);
         }
         s.setStatus(SoutenanceStatus.SOUTENANCE_EFFECTUEE);
-        return soutenanceRepository.save(s);
+        return saveAndEmit(s);
+    }
+
+    private Soutenance saveAndEmit(Soutenance s) {
+        Soutenance saved = soutenanceRepository.save(s);
+        soutenanceSink.tryEmitNext(saved);
+        return saved;
+    }
+
+    public Flux<Soutenance> soutenanceUpdates(String id) {
+        return soutenanceSink.asFlux()
+                .filter(s -> s.getId() != null && s.getId().equals(id));
     }
 }

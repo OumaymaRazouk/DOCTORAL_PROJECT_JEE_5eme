@@ -6,6 +6,7 @@ import com.exemple.inscriptionservice.services.InscriptionService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,12 @@ public class InscriptionController {
 
     public InscriptionController(InscriptionService service) {
         this.service = service;
+    }
+
+    @PermitAll
+    @GetMapping
+    public ResponseEntity<List<InscriptionDTO>> listAll() {
+        return ResponseEntity.ok(service.listAll());
     }
 
     // Inscription initiale par le candidat (ou via back-office)
@@ -145,7 +152,7 @@ public class InscriptionController {
         }
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentType(MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM))
                 .body(resource);
     }
 }
