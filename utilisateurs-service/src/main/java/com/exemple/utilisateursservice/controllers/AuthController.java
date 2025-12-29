@@ -6,15 +6,23 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
-@RequestMapping("/auth")
+@RequestMapping({"/auth", "/users/auth"})
 public class AuthController {
     private final AuthService authService;
 
     public AuthController(AuthService authService) { this.authService = authService; }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@RequestBody @Valid RegisterRequest req) { return ResponseEntity.ok(authService.register(req)); }
+    public ResponseEntity<?> register(@RequestBody @Valid RegisterRequest req) {
+        try {
+            return ResponseEntity.ok(authService.register(req));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody @Valid LoginRequest req) { return ResponseEntity.ok(authService.login(req)); }

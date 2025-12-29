@@ -3,15 +3,20 @@ package com.exemple.soutenanceservice.service;
 import com.exemple.soutenanceservice.model.*;
 import com.exemple.soutenanceservice.repository.JuryMemberRepository;
 import com.exemple.soutenanceservice.repository.SoutenanceRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
@@ -23,6 +28,23 @@ public class SoutenanceDomainService {
 
     private final SoutenanceRepository soutenanceRepository;
     private final JuryMemberRepository juryMemberRepository;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
+
+    @Value("${soutenance.prereq.min-publications:2}")
+    private int minPublications;
+
+    @Value("${soutenance.prereq.min-communications:2}")
+    private int minCommunications;
+
+    @Value("${soutenance.prereq.min-heures-formation:200}")
+    private int minHeuresFormation;
+
+    @Value("${soutenance.prereq.max-duree-annees:6}")
+    private int maxDureeAnnees;
+
+    @Value("${app.notifications.topic:inscription-events}")
+    private String notificationsTopic;
 
     private final Sinks.Many<Soutenance> soutenanceSink =
             Sinks.many().multicast().onBackpressureBuffer();
@@ -74,6 +96,13 @@ public class SoutenanceDomainService {
         s.setCommunicationsCount(input.getCommunicationsCount());
         s.setHeuresFormationCumulees(input.getHeuresFormationCumulees());
         s.setDureeDoctoratAnnees(input.getDureeDoctoratAnnees());
+        s.setManuscritPath(input.getManuscritPath());
+        s.setRapportThesePath(input.getRapportThesePath());
+        s.setRapportAntiPlagiatPath(input.getRapportAntiPlagiatPath());
+        s.setPreuvesPublicationsPath(input.getPreuvesPublicationsPath());
+        s.setPreuvesCommunicationsPath(input.getPreuvesCommunicationsPath());
+        s.setAttestationsFormationsPath(input.getAttestationsFormationsPath());
+        s.setDemandeManuscritePath(input.getDemandeManuscritePath());
     }
 
     @Transactional
@@ -91,21 +120,54 @@ public class SoutenanceDomainService {
         return saveAndEmit(s);
     }
 
+    @Transactional
+    public boolean deleteDraft(String id) {
+        Soutenance s = soutenanceRepository.findById(id).orElseThrow();
+        if (s.getStatus() != SoutenanceStatus.BROUILLON) {
+            throw new IllegalStateException("Seuls les brouillons peuvent être supprimés");
+        }
+        soutenanceRepository.delete(s);
+        return true;
+    }
+
     private String checkPrerequis(Soutenance s) {
         StringBuilder sb = new StringBuilder();
-        if (s.getPublicationsCount() < 2) {
-            sb.append("au moins 2 publications Q1/Q2; ");
+        if (s.getPublicationsCount() < minPublications) {
+            sb.append("au moins ")
+                    .append(minPublications)
+                    .append(" publication(s) Q1/Q2; ");
         }
-        if (s.getCommunicationsCount() < 2) {
-            sb.append("au moins 2 communications; ");
+        if (s.getCommunicationsCount() < minCommunications) {
+            sb.append("au moins ")
+                    .append(minCommunications)
+                    .append(" communication(s); ");
         }
-        if (s.getHeuresFormationCumulees() < 200) {
-            sb.append("200h de formation cumulées; ");
+        if (s.getHeuresFormationCumulees() < minHeuresFormation) {
+            sb.append(minHeuresFormation)
+                    .append("h de formation cumulées; ");
         }
-        if (s.getDureeDoctoratAnnees() > 6) {
-            sb.append("durée du doctorat > 6 ans; ");
+        if (s.getDureeDoctoratAnnees() > maxDureeAnnees) {
+            sb.append("durée du doctorat > ")
+                    .append(maxDureeAnnees)
+                    .append(" ans; ");
+        }
+        if (isBlank(s.getManuscritPath())) {
+            sb.append("manuscrit final manquant; ");
+        }
+        if (isBlank(s.getRapportAntiPlagiatPath())) {
+            sb.append("rapport anti-plagiat manquant; ");
+        }
+        if (isBlank(s.getAttestationsFormationsPath())) {
+            sb.append("attestations de formations manquantes; ");
+        }
+        if (isBlank(s.getDemandeManuscritePath())) {
+            sb.append("demande manuscrite manquante; ");
         }
         return sb.toString();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     @Transactional
@@ -214,6 +276,13 @@ public class SoutenanceDomainService {
                 && s.getStatus() != SoutenanceStatus.PLANIFICATION_PROPOSEE) {
             throw new IllegalStateException("La soutenance doit être autorisée ou une planification proposée avant validation de la planification");
         }
+        if (input.getDateHeure() != null && input.getSalle() != null && !input.getSalle().isBlank()) {
+            List<Soutenance> conflits = soutenanceRepository.findAllBySalleAndDatePlanifiee(input.getSalle(), input.getDateHeure());
+            boolean hasOther = conflits.stream().anyMatch(other -> other.getId() != null && !other.getId().equals(id));
+            if (hasOther) {
+                throw new IllegalStateException("Conflit de planification : une autre soutenance est déjà planifiée dans cette salle à cette date/heure");
+            }
+        }
         s.setDatePlanifiee(input.getDateHeure());
         s.setSalle(input.getSalle());
         s.setLieu(input.getLieu());
@@ -238,7 +307,43 @@ public class SoutenanceDomainService {
     private Soutenance saveAndEmit(Soutenance s) {
         Soutenance saved = soutenanceRepository.save(s);
         soutenanceSink.tryEmitNext(saved);
+        publishEvent(saved);
         return saved;
+    }
+
+    private void publishEvent(Soutenance s) {
+        if (s == null) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                Map<String, Object> payload = new java.util.HashMap<>();
+                payload.put("eventType", "SOUTENANCE_UPDATED");
+                payload.put("soutenanceId", s.getId());
+                payload.put("doctorantId", s.getDoctorantId());
+                payload.put("directeurId", s.getDirecteurId());
+                if (s.getStatus() != null) {
+                    payload.put("status", s.getStatus().name());
+                }
+                if (s.getDatePlanifiee() != null) {
+                    payload.put("datePlanifiee", s.getDatePlanifiee().toString());
+                }
+                if (s.getSalle() != null) {
+                    payload.put("salle", s.getSalle());
+                }
+                if (s.getLieu() != null) {
+                    payload.put("lieu", s.getLieu());
+                }
+                payload.put("timestamp", System.currentTimeMillis());
+                String json = objectMapper.writeValueAsString(payload);
+                kafkaTemplate.send(notificationsTopic, s.getId(), json);
+                if (log.isDebugEnabled()) {
+                    log.debug("Evenement Kafka publie: topic={}, key={}, type={}", notificationsTopic, s.getId(), "SOUTENANCE_UPDATED");
+                }
+            } catch (Exception e) {
+                log.warn("Echec envoi evenement Kafka pour soutenance {}: {}", s.getId(), e.getMessage());
+            }
+        });
     }
 
     public Flux<Soutenance> soutenanceUpdates(String id) {

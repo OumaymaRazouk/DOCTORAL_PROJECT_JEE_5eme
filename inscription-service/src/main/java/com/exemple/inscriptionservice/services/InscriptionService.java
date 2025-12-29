@@ -21,11 +21,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -131,10 +136,23 @@ public class InscriptionService {
         if (reinscriptionsValidees >= 3) {
             throw new IllegalStateException("Limite de 3 ans de réinscription atteinte (sans dérogation)");
         }
-        // règle complémentaire CdC: alerte/limite durée totale du doctorat (> 6 ans depuis première inscription)
-        long dureeSimulee = 1L + reinscriptionsValidees; // 1 année pour l'inscription initiale + réinscriptions validées
-        if (dureeSimulee >= 6) {
-            log.warn("Alerte duree doctorat >=6 ans (simule) pour doctorant {}", request.getDoctorantId());
+
+        boolean alertDureeDoctorat = false;
+        // Règles complémentaires CdC basées sur la date de première inscription
+        var firstInscription = repo.findTopByDoctorantIdAndTypeOrderByCreatedAtAsc(request.getDoctorantId(), InscriptionType.INSCRIPTION)
+                .orElse(null);
+        if (firstInscription != null && firstInscription.getDateDemande() != null) {
+            LocalDate initialDate = firstInscription.getDateDemande();
+            long yearsSinceInitial = ChronoUnit.YEARS.between(initialDate, LocalDate.now());
+            // Blocage après 3 ans sans dérogation PED
+            if (yearsSinceInitial >= 3) {
+                throw new IllegalStateException("Réinscription impossible : plus de 3 ans depuis l'inscription initiale (sans dérogation)");
+            }
+            // Alerte si durée doctorat > 5 ans
+            if (yearsSinceInitial > 5) {
+                alertDureeDoctorat = true;
+                log.warn("Alerte duree doctorat > 5 ans ({} ans) pour doctorant {}", yearsSinceInitial, request.getDoctorantId());
+            }
         }
 
         Inscription entity = Inscription.builder()
@@ -164,6 +182,10 @@ public class InscriptionService {
                 .heuresFormationCumulees(request.getHeuresFormationCumulees())
                 .build();
         entity = repo.save(entity);
+        publishEvent("REINSCRIPTION_CREATED", entity);
+        if (alertDureeDoctorat) {
+            publishEvent("REINSCRIPTION_DURATION_ALERT", entity);
+        }
         return toDTO(entity);
     }
 
@@ -295,6 +317,14 @@ public class InscriptionService {
         i.setStatus(InscriptionStatus.VALIDE);
         i = repo.save(i);
         publishEvent("INSCRIPTION_ADMIN_APPROVED", i);
+        try {
+            if (i.getType() == InscriptionType.INSCRIPTION && i.getDoctorantId() != null) {
+                userClient.grantDoctorantRole(i.getDoctorantId());
+                log.info("Role DOCTORANT attribue automatiquement a l'utilisateur {} apres validation inscription {}", i.getDoctorantId(), i.getId());
+            }
+        } catch (Exception e) {
+            log.warn("Echec de l'attribution automatique du role DOCTORANT pour utilisateur {}: {}", i.getDoctorantId(), e.getMessage());
+        }
         return toDTO(i);
     }
 
@@ -313,7 +343,15 @@ public class InscriptionService {
                                           MultipartFile lettreMotivation,
                                           MultipartFile cin) {
         var i = repo.findById(id).orElseThrow();
-        Path dir = getInscriptionDir(id);
+        Path dir = getInscriptionDir(i);
+        if (log.isInfoEnabled()) {
+            log.info("saveAttachments for inscription {} in dir={} (base={})", id, dir, storageBasePath);
+            log.info("Incoming files: diplome={}, cv={}, lettreMotivation={}, cin={}",
+                    diplome == null ? "null" : (diplome.getOriginalFilename() + " (" + diplome.getSize() + " bytes)"),
+                    cv == null ? "null" : (cv.getOriginalFilename() + " (" + cv.getSize() + " bytes)"),
+                    lettreMotivation == null ? "null" : (lettreMotivation.getOriginalFilename() + " (" + lettreMotivation.getSize() + " bytes)"),
+                    cin == null ? "null" : (cin.getOriginalFilename() + " (" + cin.getSize() + " bytes)"));
+        }
         try {
             Files.createDirectories(dir);
             saveOneAttachment(dir, diplome, "diplome");
@@ -329,10 +367,20 @@ public class InscriptionService {
     }
 
     public List<String> listAttachments(String id) {
-        Path dir = getInscriptionDir(id);
+        var i = repo.findById(id).orElseThrow();
+        Path dir = getInscriptionDir(i);
         try {
             if (!Files.exists(dir)) {
-                return List.of();
+                if (i.getType() == InscriptionType.REINSCRIPTION) {
+                    Path legacyDir = Paths.get(storageBasePath).resolve(Paths.get("inscriptions", id));
+                    if (Files.exists(legacyDir)) {
+                        dir = legacyDir;
+                    } else {
+                        return List.of();
+                    }
+                } else {
+                    return List.of();
+                }
             }
             try (var s = Files.list(dir)) {
                 return s
@@ -347,16 +395,35 @@ public class InscriptionService {
     }
 
     public Resource loadAttachment(String id, String fileName) {
-        Path dir = getInscriptionDir(id);
+        var i = repo.findById(id).orElseThrow();
+        Path dir = getInscriptionDir(i);
         Path target = dir.resolve(fileName);
         if (!Files.exists(target)) {
+            if (i.getType() == InscriptionType.REINSCRIPTION) {
+                Path legacyDir = Paths.get(storageBasePath).resolve(Paths.get("inscriptions", id));
+                Path legacyTarget = legacyDir.resolve(fileName);
+                if (Files.exists(legacyTarget)) {
+                    return new FileSystemResource(legacyTarget.toFile());
+                }
+            }
             return null;
         }
         return new FileSystemResource(target.toFile());
     }
 
     private void saveOneAttachment(Path dir, MultipartFile file, String prefix) throws IOException {
-        if (file == null || file.isEmpty()) return;
+        if (file == null) {
+            if (log.isInfoEnabled()) {
+                log.info("saveOneAttachment: no file provided for prefix={} (null)", prefix);
+            }
+            return;
+        }
+        if (file.isEmpty()) {
+            if (log.isInfoEnabled()) {
+                log.info("saveOneAttachment: empty file for prefix={} (name={}, size={})", prefix, file.getOriginalFilename(), file.getSize());
+            }
+            return;
+        }
         String original = file.getOriginalFilename();
         String safeName = original == null ? (prefix + "_" + System.currentTimeMillis()) : original.replaceAll("[^a-zA-Z0-9._-]", "_");
         int maxLen = 100;
@@ -367,6 +434,10 @@ public class InscriptionService {
             safeName = base + ext;
         }
         Path target = dir.resolve(prefix + "_" + System.currentTimeMillis() + "_" + safeName);
+        if (log.isInfoEnabled()) {
+            log.info("saveOneAttachment: saving file prefix={} original={} size={} target={}",
+                    prefix, original, file.getSize(), target);
+        }
         Files.createDirectories(target.getParent());
         file.transferTo(target.toFile());
     }
@@ -376,6 +447,8 @@ public class InscriptionService {
         // TODO: verifications de roles/statuts selon le modele reel
     }
 
+    @Retry(name = "userService")
+    @CircuitBreaker(name = "userService", fallbackMethod = "requireUserFallback")
     private UserResponse requireUser(String id, String role, String errorPrefix) {
         try {
             UserResponseWrapper wrapper = userClient.getUserById(id);
@@ -384,8 +457,13 @@ public class InscriptionService {
             return u;
         } catch (Exception e) {
             log.error("Erreur lors de la recuperation utilisateur {}: {}", id, e.getMessage());
-            throw new RuntimeException(errorPrefix + id);
+            throw e;
         }
+    }
+
+    private UserResponse requireUserFallback(String id, String role, String errorPrefix, Throwable t) {
+        log.warn("Fallback requireUser pour {} (role={}): {}", id, role, t.getMessage());
+        throw new RuntimeException(errorPrefix + id + " (service utilisateurs indisponible)");
     }
 
     private InscriptionDTO toDTO(Inscription i) {
@@ -431,8 +509,19 @@ public class InscriptionService {
 
     private boolean hasAllRequiredDocuments(String inscriptionId) {
         try {
-            Path dir = getInscriptionDir(inscriptionId);
-            if (!Files.exists(dir)) return false;
+            var i = repo.findById(inscriptionId).orElseThrow();
+            Path dir = getInscriptionDir(i);
+            if (!Files.exists(dir)) {
+                if (i.getType() == InscriptionType.REINSCRIPTION) {
+                    Path legacyDir = Paths.get(storageBasePath).resolve(Paths.get("inscriptions", inscriptionId));
+                    if (!Files.exists(legacyDir)) {
+                        return false;
+                    }
+                    dir = legacyDir;
+                } else {
+                    return false;
+                }
+            }
             try (var s = Files.list(dir)) {
                 return s.findAny().isPresent();
             }
@@ -445,14 +534,19 @@ public class InscriptionService {
     private void publishEvent(String type, Inscription i) {
         if (i == null) return;
         try {
-            Map<String, Object> payload = Map.of(
-                    "eventType", type,
-                    "inscriptionId", i.getId(),
-                    "doctorantId", i.getDoctorantId(),
-                    "directeurId", i.getDirecteurId(),
-                    "status", String.valueOf(i.getStatus()),
-                    "timestamp", System.currentTimeMillis()
-            );
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("eventType", type);
+            payload.put("inscriptionId", i.getId());
+            payload.put("doctorantId", i.getDoctorantId());
+            payload.put("directeurId", i.getDirecteurId());
+            payload.put("status", String.valueOf(i.getStatus()));
+            if (i.getType() != null) {
+                payload.put("inscriptionType", i.getType().name());
+            }
+            if (i.getAnneeAcademique() != null) {
+                payload.put("anneeAcademique", i.getAnneeAcademique());
+            }
+            payload.put("timestamp", System.currentTimeMillis());
             String json = objectMapper.writeValueAsString(payload);
             kafkaTemplate.send(notificationsTopic, i.getId(), json);
             if (log.isDebugEnabled()) {
@@ -463,8 +557,9 @@ public class InscriptionService {
         }
     }
 
-    private Path getInscriptionDir(String id) {
+    private Path getInscriptionDir(Inscription i) {
         Path base = Paths.get(storageBasePath);
-        return base.resolve(Paths.get("inscriptions", id));
+        String folder = (i.getType() == InscriptionType.REINSCRIPTION) ? "reinscriptions" : "inscriptions";
+        return base.resolve(Paths.get(folder, i.getId()));
     }
 }

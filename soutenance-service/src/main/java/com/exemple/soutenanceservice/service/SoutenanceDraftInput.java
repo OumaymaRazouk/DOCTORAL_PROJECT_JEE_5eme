@@ -15,4 +15,12 @@ public class SoutenanceDraftInput {
     private int communicationsCount;
     private int heuresFormationCumulees;
     private int dureeDoctoratAnnees;
+
+    private String manuscritPath;
+    private String rapportThesePath;
+    private String rapportAntiPlagiatPath;
+    private String preuvesPublicationsPath;
+    private String preuvesCommunicationsPath;
+    private String attestationsFormationsPath;
+    private String demandeManuscritePath;
 }

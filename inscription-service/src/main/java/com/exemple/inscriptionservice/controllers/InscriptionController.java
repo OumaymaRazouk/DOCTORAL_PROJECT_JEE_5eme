@@ -40,15 +40,15 @@ public class InscriptionController {
         return ResponseEntity.ok(service.createInscription(request));
     }
 
-    // Mise à jour d'une inscription par le doctorant (brouillon uniquement)
-    @PreAuthorize("hasAnyAuthority('DOCTORANT','SUPERADMIN')")
+    // Mise à jour d'une inscription par le candidat/doctorant (brouillon uniquement)
+    @PreAuthorize("hasAnyAuthority('CANDIDAT','DOCTORANT','SUPERADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<InscriptionDTO> update(@PathVariable String id, @RequestBody CreateInscriptionRequest request) {
         return ResponseEntity.ok(service.updateInscription(id, request));
     }
 
-    // Suppression d'une inscription en brouillon par le doctorant
-    @PreAuthorize("hasAnyAuthority('DOCTORANT','SUPERADMIN')")
+    // Suppression d'une inscription en brouillon par le candidat/doctorant
+    @PreAuthorize("hasAnyAuthority('CANDIDAT','DOCTORANT','SUPERADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.deleteInscription(id);
@@ -69,16 +69,16 @@ public class InscriptionController {
         return ResponseEntity.ok(service.prefillFromLastYear(doctorantId, annee));
     }
 
-    // Consultation d'une demande
-    @PreAuthorize("hasAnyAuthority('DOCTORANT','DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    // Consultation d'une demande par le candidat/doctorant et les rôles de suivi
+    @PreAuthorize("hasAnyAuthority('CANDIDAT','DOCTORANT','DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<InscriptionDTO> getById(@PathVariable String id) {
         var dto = service.getById(id);
         return dto == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(dto);
     }
 
-    // Historique d'un doctorant
-    @PreAuthorize("hasAnyAuthority('DOCTORANT','DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    // Historique d'un doctorant / candidat
+    @PreAuthorize("hasAnyAuthority('CANDIDAT','DOCTORANT','DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
     @GetMapping("/doctorants/{doctorantId}")
     public ResponseEntity<List<InscriptionDTO>> listByDoctorant(@PathVariable String doctorantId) {
         return ResponseEntity.ok(service.listByDoctorant(doctorantId));
@@ -98,8 +98,8 @@ public class InscriptionController {
         return ResponseEntity.ok(service.listPendingForAdmin());
     }
 
-    // Soumission au directeur de thèse
-    @PreAuthorize("hasAnyAuthority('DOCTORANT','SUPERADMIN')")
+    // Soumission au directeur de thèse par le candidat/doctorant
+    @PreAuthorize("hasAnyAuthority('CANDIDAT','DOCTORANT','SUPERADMIN')")
     @PostMapping("/{id}/submit")
     public ResponseEntity<InscriptionDTO> submit(@PathVariable String id) {
         return ResponseEntity.ok(service.submitToDirector(id));
@@ -130,20 +130,20 @@ public class InscriptionController {
     @PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<InscriptionDTO> uploadAttachments(
             @PathVariable String id,
-            @RequestParam(value = "diplome", required = false) MultipartFile diplome,
-            @RequestParam(value = "cv", required = false) MultipartFile cv,
-            @RequestParam(value = "lettreMotivation", required = false) MultipartFile lettreMotivation,
-            @RequestParam(value = "cin", required = false) MultipartFile cin) {
+            @RequestPart(value = "diplome", required = false) MultipartFile diplome,
+            @RequestPart(value = "cv", required = false) MultipartFile cv,
+            @RequestPart(value = "lettreMotivation", required = false) MultipartFile lettreMotivation,
+            @RequestPart(value = "cin", required = false) MultipartFile cin) {
         return ResponseEntity.ok(service.saveAttachments(id, diplome, cv, lettreMotivation, cin));
     }
 
-    @PreAuthorize("hasAnyAuthority('DOCTORANT','DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @PermitAll
     @GetMapping("/{id}/attachments")
     public ResponseEntity<List<String>> listAttachments(@PathVariable String id) {
         return ResponseEntity.ok(service.listAttachments(id));
     }
 
-    @PreAuthorize("hasAnyAuthority('DOCTORANT','DIRECTEUR','PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @PermitAll
     @GetMapping("/{id}/attachments/{fileName}")
     public ResponseEntity<Resource> downloadAttachment(@PathVariable String id, @PathVariable String fileName) {
         Resource resource = service.loadAttachment(id, fileName);

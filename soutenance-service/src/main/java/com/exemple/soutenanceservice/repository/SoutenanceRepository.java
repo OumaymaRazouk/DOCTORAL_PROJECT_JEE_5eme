@@ -16,4 +16,6 @@ public interface SoutenanceRepository extends JpaRepository<Soutenance, String> 
     List<Soutenance> findAllByDirecteurIdOrderByCreatedAtDesc(String directeurId);
 
     List<Soutenance> findAllByStatusOrderByCreatedAtDesc(SoutenanceStatus status);
+
+    List<Soutenance> findAllBySalleAndDatePlanifiee(String salle, java.time.LocalDateTime datePlanifiee);
 }

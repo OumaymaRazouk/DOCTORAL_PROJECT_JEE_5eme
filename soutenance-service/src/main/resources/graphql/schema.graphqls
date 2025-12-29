@@ -76,6 +76,13 @@ input SoutenanceDraftInput {
   communicationsCount: Int!
   heuresFormationCumulees: Int!
   dureeDoctoratAnnees: Int!
+  manuscritPath: String
+  rapportThesePath: String
+  rapportAntiPlagiatPath: String
+  preuvesPublicationsPath: String
+  preuvesCommunicationsPath: String
+  attestationsFormationsPath: String
+  demandeManuscritePath: String
 }
 
 input JuryMemberInput {
@@ -105,6 +112,7 @@ type Query {
 type Mutation {
   saveSoutenanceDraft(input: SoutenanceDraftInput!): Soutenance!
   submitSoutenance(id: ID!): Soutenance!
+  deleteSoutenanceDraft(id: ID!): Boolean!
 
   adminMarkPrerequisUnderReview(id: ID!): Soutenance!
   adminValidatePrerequis(id: ID!, commentaire: String): Soutenance!

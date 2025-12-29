@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -72,6 +73,37 @@ public class UsersController {
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "OK",
+                "data", dto
+        ));
+    }
+
+    @PreAuthorize("hasAnyRole('PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @PostMapping("/{id}/grant-doctorant")
+    public ResponseEntity<?> grantDoctorant(@PathVariable Long id) {
+        var u = users.findById(id).orElse(null);
+        if (u == null) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "success", false,
+                    "message", "User not found",
+                    "data", null
+            ));
+        }
+        var roles = u.getRoles();
+        if (!roles.contains(Role.DOCTORANT)) {
+            roles.add(Role.DOCTORANT);
+            u.setRoles(roles);
+            users.save(u);
+        }
+        var dto = Map.of(
+                "id", String.valueOf(u.getId()),
+                "email", u.getEmail(),
+                "firstName", u.getFirstName(),
+                "lastName", u.getLastName(),
+                "roles", u.getRoles()
+        );
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "ROLE_DOCTORANT_GRANTED",
                 "data", dto
         ));
     }

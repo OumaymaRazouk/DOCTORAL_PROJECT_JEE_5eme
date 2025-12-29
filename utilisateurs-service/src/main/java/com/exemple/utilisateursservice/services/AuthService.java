@@ -35,7 +35,7 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest req) {
         if (userRepository.existsByEmail(req.getEmail())) throw new IllegalArgumentException("Email already used");
-        Set<Role> roles = req.getRoles()==null || req.getRoles().isEmpty()? Set.of(Role.DOCTORANT): req.getRoles();
+        Set<Role> roles = (req.getRoles() == null || req.getRoles().isEmpty()) ? Set.of(Role.CANDIDAT) : req.getRoles();
         var user = User.builder()
                 .firstName(req.getFirstName())
                 .lastName(req.getLastName())

@@ -5,17 +5,21 @@ import com.exemple.soutenanceservice.model.Soutenance;
 import com.exemple.soutenanceservice.model.SoutenanceStatus;
 import com.exemple.soutenanceservice.repository.JuryMemberRepository;
 import com.exemple.soutenanceservice.service.*;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
 import org.springframework.stereotype.Controller;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import reactor.core.publisher.Flux;
 
 @Controller
@@ -26,21 +30,25 @@ public class SoutenanceGraphQLController {
     private final JuryMemberRepository juryMemberRepository;
 
     @QueryMapping
+    @CircuitBreaker(name = "soutenanceGraphQL", fallbackMethod = "fallbackSoutenanceById")
     public Soutenance soutenanceById(@Argument String id) {
         return domainService.getById(id);
     }
 
     @QueryMapping
+    @CircuitBreaker(name = "soutenanceGraphQL", fallbackMethod = "fallbackSoutenancesForDoctorant")
     public List<Soutenance> soutenancesForDoctorant(@Argument String doctorantId) {
         return domainService.listForDoctorant(doctorantId);
     }
 
     @QueryMapping
+    @CircuitBreaker(name = "soutenanceGraphQL", fallbackMethod = "fallbackSoutenancesForDirecteur")
     public List<Soutenance> soutenancesForDirecteur(@Argument String directeurId) {
         return domainService.listForDirecteur(directeurId);
     }
 
     @QueryMapping
+    @CircuitBreaker(name = "soutenanceGraphQL", fallbackMethod = "fallbackSoutenancesForAdmin")
     public List<Soutenance> soutenancesForAdmin(@Argument(name = "status") SoutenanceStatus status) {
         return domainService.listForAdmin(status);
     }
@@ -53,6 +61,11 @@ public class SoutenanceGraphQLController {
     @MutationMapping
     public Soutenance submitSoutenance(@Argument String id) {
         return domainService.submit(id);
+    }
+
+    @MutationMapping
+    public Boolean deleteSoutenanceDraft(@Argument String id) {
+        return domainService.deleteDraft(id);
     }
 
     @MutationMapping
@@ -109,15 +122,53 @@ public class SoutenanceGraphQLController {
 
     // Champ jury: exposer la liste des membres pour une soutenance
     @QueryMapping
+    @CircuitBreaker(name = "soutenanceGraphQL", fallbackMethod = "fallbackJuryForSoutenance")
     public List<JuryMember> juryForSoutenance(@Argument String soutenanceId) {
         if (soutenanceId == null) return Collections.emptyList();
         return juryMemberRepository.findAllBySoutenance_Id(soutenanceId);
     }
 
+    @SchemaMapping(typeName = "Soutenance", field = "motsCles")
+    public List<String> motsCles(Soutenance source) {
+        String raw = source.getMotsCles();
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
     @SubscriptionMapping
+    @CircuitBreaker(name = "soutenanceGraphQL", fallbackMethod = "fallbackSoutenanceUpdated")
     public Flux<Soutenance> soutenanceUpdated(@Argument String id) {
         Soutenance current = domainService.getById(id);
         Flux<Soutenance> initial = current != null ? Flux.just(current) : Flux.empty();
         return initial.concatWith(domainService.soutenanceUpdates(id));
+    }
+
+    private Soutenance fallbackSoutenanceById(String id, Throwable t) {
+        return null;
+    }
+
+    private List<Soutenance> fallbackSoutenancesForDoctorant(String doctorantId, Throwable t) {
+        return Collections.emptyList();
+    }
+
+    private List<Soutenance> fallbackSoutenancesForDirecteur(String directeurId, Throwable t) {
+        return Collections.emptyList();
+    }
+
+    private List<Soutenance> fallbackSoutenancesForAdmin(SoutenanceStatus status, Throwable t) {
+        return Collections.emptyList();
+    }
+
+    private List<JuryMember> fallbackJuryForSoutenance(String soutenanceId, Throwable t) {
+        return Collections.emptyList();
+    }
+
+    private Flux<Soutenance> fallbackSoutenanceUpdated(String id, Throwable t) {
+        return Flux.empty();
     }
 }
