@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Attestation d'inscription</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11pt;
+            margin: 40px 60px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .title {
+            text-align: center;
+            font-size: 16pt;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 30px;
+        }
+        .content {
+            line-height: 1.6;
+        }
+        .footer {
+            margin-top: 60px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <div>ROYAUME DU MAROC</div>
+    <div>Université Hassan II</div>
+    <div>Faculté des Sciences Juridiques, Economiques et Sociales</div>
+</div>
+
+<div class="title">ATTESTATION D'INSCRIPTION</div>
+
+<div class="content">
+    <p>
+        Le Doyen de la Faculté atteste que l'étudiant(e) :
+    </p>
+    <p>
+        <strong>${NOM_COMPLET}</strong><br/>
+        CNE : <strong>${CNE}</strong><br/>
+    </p>
+    <p>
+        est régulièrement inscrit(e) en doctorat pour l'année universitaire
+        <strong>${ANNEE_ACADEMIQUE}</strong>, spécialité
+        <strong>${SPECIALITE}</strong>, au sein du laboratoire
+        <strong>${LABORATOIRE}</strong>.
+    </p>
+    <p>
+        Sujet de thèse : <strong>${SUJET_THESE}</strong>
+    </p>
+    <p>
+        Date d'inscription : <strong>${DATE_INSCRIPTION}</strong>
+    </p>
+</div>
+
+<div class="footer">
+    Fait à Casablanca, le ${DATE_INSCRIPTION}
+</div>
+</body>
+</html>

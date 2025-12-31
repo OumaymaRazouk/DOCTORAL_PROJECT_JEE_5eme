@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Tableau de suivi de la documentation recueillie</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; margin: 30px 40px; }
+        .title { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #000; padding: 4px; }
+        th { background-color: #f0f0f0; }
+        td { height: 18px; }
+    </style>
+</head>
+<body>
+<div class="title">Modèle de tableau de suivi de la documentation recueillie</div>
+
+<table>
+    <thead>
+    <tr>
+        <th>Nom du document</th>
+        <th>Type</th>
+        <th>Étape du processus</th>
+        <th>Statut du document</th>
+        <th>Version</th>
+        <th>Date de dépôt</th>
+        <th>Déposé par</th>
+        <th>Validé par</th>
+        <th>Date de validation</th>
+        <th>Commentaire / motif</th>
+        <th>Lien (consultation / PDF)</th>
+        <th>Historique / traçabilité</th>
+    </tr>
+    </thead>
+    <tbody>
+    <!-- Lignes générées dynamiquement -->
+    ${LIGNES}
+    </tbody>
+</table>
+</body>
+</html>

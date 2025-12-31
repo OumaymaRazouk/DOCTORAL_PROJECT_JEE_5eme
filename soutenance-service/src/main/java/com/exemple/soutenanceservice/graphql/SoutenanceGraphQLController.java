@@ -3,6 +3,7 @@ package com.exemple.soutenanceservice.graphql;
 import com.exemple.soutenanceservice.model.JuryMember;
 import com.exemple.soutenanceservice.model.Soutenance;
 import com.exemple.soutenanceservice.model.SoutenanceStatus;
+import com.exemple.soutenanceservice.model.PrerequisSoutenanceConfig;
 import com.exemple.soutenanceservice.repository.JuryMemberRepository;
 import com.exemple.soutenanceservice.service.*;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -51,6 +52,11 @@ public class SoutenanceGraphQLController {
     @CircuitBreaker(name = "soutenanceGraphQL", fallbackMethod = "fallbackSoutenancesForAdmin")
     public List<Soutenance> soutenancesForAdmin(@Argument(name = "status") SoutenanceStatus status) {
         return domainService.listForAdmin(status);
+    }
+
+    @QueryMapping
+    public PrerequisSoutenanceConfig prerequisConfigForDoctorant(@Argument String doctorantId) {
+        return domainService.getPrerequisConfig(doctorantId);
     }
 
     @MutationMapping
@@ -118,6 +124,11 @@ public class SoutenanceGraphQLController {
             }
         }
         return domainService.adminMarqueEffectuee(id, effective);
+    }
+
+    @MutationMapping
+    public PrerequisSoutenanceConfig savePrerequisConfig(@Argument PrerequisConfigInput input) {
+        return domainService.savePrerequisConfig(input);
     }
 
     // Champ jury: exposer la liste des membres pour une soutenance

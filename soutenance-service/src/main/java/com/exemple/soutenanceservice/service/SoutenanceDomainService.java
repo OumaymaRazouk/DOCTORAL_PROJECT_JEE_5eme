@@ -3,6 +3,7 @@ package com.exemple.soutenanceservice.service;
 import com.exemple.soutenanceservice.model.*;
 import com.exemple.soutenanceservice.repository.JuryMemberRepository;
 import com.exemple.soutenanceservice.repository.SoutenanceRepository;
+import com.exemple.soutenanceservice.repository.PrerequisSoutenanceConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -28,6 +29,7 @@ public class SoutenanceDomainService {
 
     private final SoutenanceRepository soutenanceRepository;
     private final JuryMemberRepository juryMemberRepository;
+    private final PrerequisSoutenanceConfigRepository prerequisConfigRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
@@ -62,6 +64,47 @@ public class SoutenanceDomainService {
             return soutenanceRepository.findAllByStatusOrderByCreatedAtDesc(status);
         }
         return soutenanceRepository.findAll();
+    }
+
+    public PrerequisSoutenanceConfig getPrerequisConfig(String doctorantId) {
+        if (doctorantId == null || doctorantId.isBlank()) {
+            return null;
+        }
+        return prerequisConfigRepository.findByDoctorantId(doctorantId)
+                .orElseGet(() -> PrerequisSoutenanceConfig.builder()
+                        .doctorantId(doctorantId)
+                        .minPublications(minPublications)
+                        .minCommunications(minCommunications)
+                        .minHeuresFormation(minHeuresFormation)
+                        .maxDureeAnnees(maxDureeAnnees)
+                        .requireManuscrit(true)
+                        .requireAntiPlagiat(true)
+                        .requireAttestations(true)
+                        .requireDemandeManuscrite(true)
+                        .build());
+    }
+
+    @Transactional
+    public PrerequisSoutenanceConfig savePrerequisConfig(PrerequisConfigInput input) {
+        if (input == null || input.getDoctorantId() == null || input.getDoctorantId().isBlank()) {
+            throw new IllegalArgumentException("doctorantId is required");
+        }
+        PrerequisSoutenanceConfig existing = prerequisConfigRepository
+                .findByDoctorantId(input.getDoctorantId())
+                .orElseGet(() -> PrerequisSoutenanceConfig.builder()
+                        .doctorantId(input.getDoctorantId())
+                        .build());
+
+        existing.setMinPublications(input.getMinPublications());
+        existing.setMinCommunications(input.getMinCommunications());
+        existing.setMinHeuresFormation(input.getMinHeuresFormation());
+        existing.setMaxDureeAnnees(input.getMaxDureeAnnees());
+        existing.setRequireManuscrit(input.isRequireManuscrit());
+        existing.setRequireAntiPlagiat(input.isRequireAntiPlagiat());
+        existing.setRequireAttestations(input.isRequireAttestations());
+        existing.setRequireDemandeManuscrite(input.isRequireDemandeManuscrite());
+
+        return prerequisConfigRepository.save(existing);
     }
 
     public Soutenance getById(String id) {
@@ -132,35 +175,55 @@ public class SoutenanceDomainService {
 
     private String checkPrerequis(Soutenance s) {
         StringBuilder sb = new StringBuilder();
-        if (s.getPublicationsCount() < minPublications) {
+
+        PrerequisSoutenanceConfig cfg = null;
+        if (s.getDoctorantId() != null) {
+            cfg = prerequisConfigRepository.findByDoctorantId(s.getDoctorantId()).orElse(null);
+        }
+
+        int effectiveMinPublications = cfg != null && cfg.getMinPublications() > 0
+                ? cfg.getMinPublications() : minPublications;
+        int effectiveMinCommunications = cfg != null && cfg.getMinCommunications() > 0
+                ? cfg.getMinCommunications() : minCommunications;
+        int effectiveMinHeures = cfg != null && cfg.getMinHeuresFormation() > 0
+                ? cfg.getMinHeuresFormation() : minHeuresFormation;
+        int effectiveMaxDuree = cfg != null && cfg.getMaxDureeAnnees() > 0
+                ? cfg.getMaxDureeAnnees() : maxDureeAnnees;
+
+        boolean requireManuscrit = cfg != null ? cfg.isRequireManuscrit() : true;
+        boolean requireAntiPlagiat = cfg != null ? cfg.isRequireAntiPlagiat() : true;
+        boolean requireAttestations = cfg != null ? cfg.isRequireAttestations() : true;
+        boolean requireDemande = cfg != null ? cfg.isRequireDemandeManuscrite() : true;
+
+        if (s.getPublicationsCount() < effectiveMinPublications) {
             sb.append("au moins ")
-                    .append(minPublications)
+                    .append(effectiveMinPublications)
                     .append(" publication(s) Q1/Q2; ");
         }
-        if (s.getCommunicationsCount() < minCommunications) {
+        if (s.getCommunicationsCount() < effectiveMinCommunications) {
             sb.append("au moins ")
-                    .append(minCommunications)
+                    .append(effectiveMinCommunications)
                     .append(" communication(s); ");
         }
-        if (s.getHeuresFormationCumulees() < minHeuresFormation) {
-            sb.append(minHeuresFormation)
+        if (s.getHeuresFormationCumulees() < effectiveMinHeures) {
+            sb.append(effectiveMinHeures)
                     .append("h de formation cumulées; ");
         }
-        if (s.getDureeDoctoratAnnees() > maxDureeAnnees) {
+        if (s.getDureeDoctoratAnnees() > effectiveMaxDuree) {
             sb.append("durée du doctorat > ")
-                    .append(maxDureeAnnees)
+                    .append(effectiveMaxDuree)
                     .append(" ans; ");
         }
-        if (isBlank(s.getManuscritPath())) {
+        if (requireManuscrit && isBlank(s.getManuscritPath())) {
             sb.append("manuscrit final manquant; ");
         }
-        if (isBlank(s.getRapportAntiPlagiatPath())) {
+        if (requireAntiPlagiat && isBlank(s.getRapportAntiPlagiatPath())) {
             sb.append("rapport anti-plagiat manquant; ");
         }
-        if (isBlank(s.getAttestationsFormationsPath())) {
+        if (requireAttestations && isBlank(s.getAttestationsFormationsPath())) {
             sb.append("attestations de formations manquantes; ");
         }
-        if (isBlank(s.getDemandeManuscritePath())) {
+        if (requireDemande && isBlank(s.getDemandeManuscritePath())) {
             sb.append("demande manuscrite manquante; ");
         }
         return sb.toString();

@@ -18,6 +18,7 @@
     <module>soutenance-service</module>
     <module>inscription-stat-soap-service</module>
     <module>soutenance-stat-grpc-service</module>
+    <module>document-service</module>
   </modules>
 
 </project>

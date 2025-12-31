@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Autorisation de soutenance</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; margin: 40px 60px; }
+        .title { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 30px; }
+        .content { line-height: 1.6; }
+        .footer { margin-top: 40px; }
+    </style>
+</head>
+<body>
+<div class="title">AUTORISATION DE SOUTENANCE DE THÈSE</div>
+
+<div class="content">
+    <p>
+        Nous, responsables de la formation doctorale, autorisons le doctorant :<br/>
+        <strong>${DOCTORANT}</strong><br/>
+        dirigé par : <strong>${DIRECTEUR}</strong>,
+    </p>
+    <p>
+        à soutenir sa thèse intitulée :<br/>
+        <strong>${TITRE_THESE}</strong>.
+    </p>
+    <p>
+        La soutenance est programmée en principe à la date et au lieu suivants (sous réserve de confirmation) :<br/>
+        Date d'autorisation : <strong>${DATE_AUTORISATION}</strong><br/>
+        Salle / Lieu : <strong>${SALLE}</strong> - <strong>${LIEU}</strong>
+    </p>
+</div>
+
+<div class="footer">
+    Fait pour servir et valoir ce que de droit.
+</div>
+</body>
+</html>

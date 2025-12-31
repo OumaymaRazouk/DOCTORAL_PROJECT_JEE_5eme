@@ -101,12 +101,37 @@ input PlanificationInput {
   lienVisioconference: String
 }
 
+type PrerequisSoutenanceConfig {
+  doctorantId: ID!
+  minPublications: Int!
+  minCommunications: Int!
+  minHeuresFormation: Int!
+  maxDureeAnnees: Int!
+  requireManuscrit: Boolean!
+  requireAntiPlagiat: Boolean!
+  requireAttestations: Boolean!
+  requireDemandeManuscrite: Boolean!
+}
+
+input PrerequisConfigInput {
+  doctorantId: ID!
+  minPublications: Int!
+  minCommunications: Int!
+  minHeuresFormation: Int!
+  maxDureeAnnees: Int!
+  requireManuscrit: Boolean!
+  requireAntiPlagiat: Boolean!
+  requireAttestations: Boolean!
+  requireDemandeManuscrite: Boolean!
+}
+
 type Query {
   soutenanceById(id: ID!): Soutenance
   soutenancesForDoctorant(doctorantId: ID!): [Soutenance!]!
   soutenancesForDirecteur(directeurId: ID!): [Soutenance!]!
   soutenancesForAdmin(status: SoutenanceStatus): [Soutenance!]!
   juryForSoutenance(soutenanceId: String!): [JuryMember!]!
+  prerequisConfigForDoctorant(doctorantId: ID!): PrerequisSoutenanceConfig
 }
 
 type Mutation {
@@ -125,6 +150,7 @@ type Mutation {
   directeurProposePlanification(id: ID!, input: PlanificationInput!): Soutenance!
   adminPlanifySoutenance(id: ID!, input: PlanificationInput!): Soutenance!
   adminMarkSoutenanceDone(id: ID!, dateEffective: String): Soutenance!
+  savePrerequisConfig(input: PrerequisConfigInput!): PrerequisSoutenanceConfig!
 }
 
 type Subscription {

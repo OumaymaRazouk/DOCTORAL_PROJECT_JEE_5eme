@@ -1,0 +1,15 @@
+package com.exemple.documentservice.dto;
+
+public enum SoutenanceStatus {
+    BROUILLON,
+    SOUMIS,
+    PREREQUIS_EN_VERIFICATION,
+    PREREQUIS_VALIDES,
+    JURY_PROPOSE,
+    JURY_VALIDE,
+    SOUTENANCE_AUTORISEE,
+    PLANIFICATION_PROPOSEE,
+    SOUTENANCE_PLANIFIEE,
+    SOUTENANCE_EFFECTUEE,
+    REJETE
+}

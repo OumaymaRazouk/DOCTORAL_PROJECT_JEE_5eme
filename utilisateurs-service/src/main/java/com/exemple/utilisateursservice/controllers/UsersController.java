@@ -53,6 +53,20 @@ public class UsersController {
         return ResponseEntity.ok(admins);
     }
 
+    @PreAuthorize("hasAnyRole('PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @GetMapping("/candidats")
+    public ResponseEntity<List<User>> listCandidats() {
+        var candidats = users.findAllByRole(Role.CANDIDAT);
+        return ResponseEntity.ok(candidats);
+    }
+
+    @PreAuthorize("hasAnyRole('PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @GetMapping("/doctorants")
+    public ResponseEntity<List<User>> listDoctorants() {
+        var doctorants = users.findAllByRole(Role.DOCTORANT);
+        return ResponseEntity.ok(doctorants);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         var u = users.findById(id).orElse(null);

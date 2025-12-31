@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Rapport récapitulatif du parcours doctoral</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; margin: 40px 60px; }
+        .title { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #000; padding: 6px; font-size: 10pt; }
+        th { background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+<div class="title">Rapport récapitulatif du parcours doctoral</div>
+
+<p>Doctorant ID : <strong>${DOCTORANT_ID}</strong></p>
+
+<table>
+    <thead>
+    <tr>
+        <th>Type d'inscription</th>
+        <th>Statut</th>
+        <th>Date de demande</th>
+        <th>Année académique</th>
+    </tr>
+    </thead>
+    <tbody>
+    ${LIGNES}
+    </tbody>
+</table>
+</body>
+</html>
