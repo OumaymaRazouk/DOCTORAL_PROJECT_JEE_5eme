@@ -93,6 +93,19 @@ public class SoutenanceDomainService {
         return prerequisDossierRepository.findById(doctorantId).orElse(null);
     }
 
+    public List<PrerequisDossier> listPrerequisDossiersPendingScientifique() {
+        return prerequisDossierRepository
+                .findAllByEtatScientifiqueOrderByUpdatedAtDesc(PrerequisDossierEtat.EN_ATTENTE);
+    }
+
+    public List<PrerequisDossier> listPrerequisDossiersPendingAdministratif() {
+        return prerequisDossierRepository
+                .findAllByEtatScientifiqueAndEtatAdministratifOrderByUpdatedAtDesc(
+                        PrerequisDossierEtat.VALIDE,
+                        PrerequisDossierEtat.EN_ATTENTE
+                );
+    }
+
     @Transactional
     public PrerequisDossier savePrerequisDossier(PrerequisDossierInput input) {
         if (input == null || input.getDoctorantId() == null || input.getDoctorantId().isBlank()) {

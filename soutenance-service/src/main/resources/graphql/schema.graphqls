@@ -156,6 +156,8 @@ type Query {
   soutenancesForAdmin(status: SoutenanceStatus): [Soutenance!]!
   juryForSoutenance(soutenanceId: String!): [JuryMember!]!
   prerequisDossierForDoctorant(doctorantId: ID!): PrerequisDossier
+  prerequisDossiersPendingScientifique: [PrerequisDossier!]!
+  prerequisDossiersPendingAdministratif: [PrerequisDossier!]!
   prerequisConfigForDoctorant(doctorantId: ID!): PrerequisSoutenanceConfig
 }
 

@@ -24,10 +24,10 @@ public class InscriptionNotificationListener {
     private final JavaMailSender mailSender;
     private final UserClient userClient;
 
-    @Value("${app.notifications.email.from:no-reply@doctorat.local}")
+    @Value("${app.notifications.email.from:chtiouimariam745@gmail.com}")
     private String fromAddress;
 
-    @Value("${app.notifications.email.to:admin@doctorat.local}")
+    @Value("${app.notifications.email.to:oumaymarazouk195@gmail.com}")
     private String defaultToAddress;
 
     @Value("${app.notifications.email.to.doctorant:}")

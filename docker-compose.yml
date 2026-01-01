@@ -130,8 +130,8 @@ services:
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      MAIL_HOST: smtp.example.com
-      MAIL_PORT: 587
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 465
       MAIL_USERNAME: chtiouimariam745@gmail.com
       MAIL_PASSWORD: liexbwevulmspxmy
 

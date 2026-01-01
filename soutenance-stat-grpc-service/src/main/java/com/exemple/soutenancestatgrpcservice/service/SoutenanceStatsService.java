@@ -7,7 +7,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
+import java.time.temporal.TemporalAccessor;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -24,35 +29,73 @@ public class SoutenanceStatsService {
     }
 
     public List<WeeklySoutenanceSummary> getWeeklyStats(String startDate, String endDate, boolean includeDetails) {
-        LocalDate start = startDate != null ? LocalDate.parse(startDate) : LocalDate.now().minusWeeks(4);
-        LocalDate end = endDate != null ? LocalDate.parse(endDate) : LocalDate.now().plusWeeks(4);
+        LocalDate start = LocalDate.MIN;
+        LocalDate end = LocalDate.MAX;
+        if (startDate != null && !startDate.isBlank()) {
+            start = LocalDate.parse(startDate);
+        }
+        if (endDate != null && !endDate.isBlank()) {
+            end = LocalDate.parse(endDate);
+        }
+
+        final LocalDate startFinal = start;
+        final LocalDate endFinal = end;
 
         List<SoutenanceView> planned = graphQLClient.listPlannedSoutenances();
         WeekFields wf = WeekFields.of(Locale.getDefault());
 
         Map<String, List<SoutenanceView>> byWeek = planned.stream()
-                .filter(v -> v.getDatePlanifiee() != null)
-                .filter(v -> isBetween(v.getDatePlanifiee(), start, end))
+                .filter(v -> v.getDatePlanifiee() != null && !v.getDatePlanifiee().isBlank())
+                .filter(v -> isBetween(v.getDatePlanifiee(), startFinal, endFinal))
                 .collect(Collectors.groupingBy(v -> weekKey(v.getDatePlanifiee(), wf)));
 
         return byWeek.entrySet().stream()
+                .filter(e -> e.getKey() != null && !e.getKey().equals("INVALID"))
                 .map(e -> toSummary(e.getKey(), e.getValue(), wf, includeDetails))
                 .sorted(Comparator.comparing(WeeklySoutenanceSummary::getWeekStart))
                 .collect(Collectors.toList());
     }
 
     private boolean isBetween(String dateTimeStr, LocalDate start, LocalDate end) {
-        LocalDateTime dt = LocalDateTime.parse(dateTimeStr);
+        LocalDateTime dt = parseDateTime(dateTimeStr);
+        if (dt == null) {
+            return false;
+        }
         LocalDate d = dt.toLocalDate();
         return (d.isEqual(start) || d.isAfter(start)) && (d.isEqual(end) || d.isBefore(end));
     }
 
     private String weekKey(String dateTimeStr, WeekFields wf) {
-        LocalDateTime dt = LocalDateTime.parse(dateTimeStr);
+        LocalDateTime dt = parseDateTime(dateTimeStr);
+        if (dt == null) {
+            return "INVALID";
+        }
         LocalDate d = dt.toLocalDate();
         int week = d.get(wf.weekOfWeekBasedYear());
         int year = d.get(wf.weekBasedYear());
         return year + "-W" + week;
+    }
+
+    private LocalDateTime parseDateTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            TemporalAccessor ta = DateTimeFormatter.ISO_DATE_TIME
+                    .parseBest(value, OffsetDateTime::from, ZonedDateTime::from, LocalDateTime::from);
+            if (ta instanceof OffsetDateTime odt) {
+                return odt.toLocalDateTime();
+            }
+            if (ta instanceof ZonedDateTime zdt) {
+                return zdt.toLocalDateTime();
+            }
+            if (ta instanceof LocalDateTime ldt) {
+                return ldt;
+            }
+            return null;
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     private WeeklySoutenanceSummary toSummary(String key, List<SoutenanceView> list, WeekFields wf, boolean includeDetails) {

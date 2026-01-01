@@ -8,6 +8,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
@@ -16,9 +18,11 @@ import java.util.Map;
 @Component
 public class SoutenanceGraphQLClient {
 
+    private static final Logger log = LoggerFactory.getLogger(SoutenanceGraphQLClient.class);
+
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${soutenance.service.url}")
+    @Value("${soutenance.service.url:http://localhost:8084/graphql}")
     private String graphqlUrl;
 
     public List<SoutenanceView> listPlannedSoutenances() {
@@ -36,11 +40,20 @@ public class SoutenanceGraphQLClient {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         Map<String, Object> response = restTemplate.postForObject(graphqlUrl, entity, Map.class);
-        if (response == null || !response.containsKey("data")) {
+        if (response == null) {
+            log.warn("GraphQL response is null when calling {}", graphqlUrl);
+            return List.of();
+        }
+        if (response.containsKey("errors")) {
+            log.warn("GraphQL returned errors from {}: {}", graphqlUrl, response.get("errors"));
+        }
+        if (!response.containsKey("data") || response.get("data") == null) {
+            log.warn("GraphQL response has no data when calling {}", graphqlUrl);
             return List.of();
         }
         Map<String, Object> data = (Map<String, Object>) response.get("data");
@@ -78,10 +91,19 @@ public class SoutenanceGraphQLClient {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         Map<String, Object> response = restTemplate.postForObject(graphqlUrl, entity, Map.class);
-        if (response == null || !response.containsKey("data")) {
+        if (response == null) {
+            log.warn("GraphQL response is null when calling {}", graphqlUrl);
+            return List.of();
+        }
+        if (response.containsKey("errors")) {
+            log.warn("GraphQL returned errors from {}: {}", graphqlUrl, response.get("errors"));
+        }
+        if (!response.containsKey("data") || response.get("data") == null) {
+            log.warn("GraphQL response has no data when calling {}", graphqlUrl);
             return List.of();
         }
         Map<String, Object> data = (Map<String, Object>) response.get("data");

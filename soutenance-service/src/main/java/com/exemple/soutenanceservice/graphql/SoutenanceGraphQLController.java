@@ -65,6 +65,16 @@ public class SoutenanceGraphQLController {
         return domainService.getPrerequisDossier(doctorantId);
     }
 
+    @QueryMapping
+    public List<PrerequisDossier> prerequisDossiersPendingScientifique() {
+        return domainService.listPrerequisDossiersPendingScientifique();
+    }
+
+    @QueryMapping
+    public List<PrerequisDossier> prerequisDossiersPendingAdministratif() {
+        return domainService.listPrerequisDossiersPendingAdministratif();
+    }
+
     @MutationMapping
     public Soutenance saveSoutenanceDraft(@Argument SoutenanceDraftInput input) {
         return domainService.saveDraft(input);
