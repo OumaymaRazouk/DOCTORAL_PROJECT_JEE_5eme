@@ -37,12 +37,6 @@ public class Soutenance {
      */
     private String motsCles;
 
-    // Prérequis quantitatifs
-    private int publicationsCount;          // >= 2 Q1/Q2
-    private int communicationsCount;        // >= 2
-    private int heuresFormationCumulees;    // >= 200
-    private int dureeDoctoratAnnees;        // <= 6
-
     // Pièces jointes (chemins sur disque ou URLs de stockage)
     private String manuscritPath;
     private String rapportThesePath;

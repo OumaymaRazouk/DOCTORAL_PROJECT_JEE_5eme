@@ -132,8 +132,8 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MAIL_HOST: smtp.example.com
       MAIL_PORT: 587
-      MAIL_USERNAME: demo
-      MAIL_PASSWORD: changeme
+      MAIL_USERNAME: chtiouimariam745@gmail.com
+      MAIL_PASSWORD: liexbwevulmspxmy
 
   inscription-stat-soap-service:
     image: doctorat/inscription-stat-soap-service:latest

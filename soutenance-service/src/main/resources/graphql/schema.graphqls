@@ -39,11 +39,6 @@ type Soutenance {
   resumeFinal: String
   motsCles: [String!]
 
-  publicationsCount: Int!
-  communicationsCount: Int!
-  heuresFormationCumulees: Int!
-  dureeDoctoratAnnees: Int!
-
   manuscritPath: String
   rapportThesePath: String
   rapportAntiPlagiatPath: String
@@ -72,10 +67,6 @@ input SoutenanceDraftInput {
   titreTheseDefinitif: String!
   resumeFinal: String!
   motsCles: [String!]!
-  publicationsCount: Int!
-  communicationsCount: Int!
-  heuresFormationCumulees: Int!
-  dureeDoctoratAnnees: Int!
   manuscritPath: String
   rapportThesePath: String
   rapportAntiPlagiatPath: String
@@ -83,6 +74,39 @@ input SoutenanceDraftInput {
   preuvesCommunicationsPath: String
   attestationsFormationsPath: String
   demandeManuscritePath: String
+}
+
+enum PrerequisDossierEtat {
+  EN_ATTENTE
+  VALIDE
+  REFUSE
+}
+
+type PrerequisDossier {
+  doctorantId: ID!
+  publicationsCount: Int!
+  communicationsCount: Int!
+  heuresFormationCumulees: Int!
+  dureeDoctoratAnnees: Int!
+
+  etatScientifique: PrerequisDossierEtat!
+  commentaireScientifique: String
+  dateValidationScientifique: String
+
+  etatAdministratif: PrerequisDossierEtat!
+  commentaireAdministratif: String
+  dateValidationAdministratif: String
+
+  createdAt: String
+  updatedAt: String
+}
+
+input PrerequisDossierInput {
+  doctorantId: ID!
+  publicationsCount: Int!
+  communicationsCount: Int!
+  heuresFormationCumulees: Int!
+  dureeDoctoratAnnees: Int!
 }
 
 input JuryMemberInput {
@@ -131,6 +155,7 @@ type Query {
   soutenancesForDirecteur(directeurId: ID!): [Soutenance!]!
   soutenancesForAdmin(status: SoutenanceStatus): [Soutenance!]!
   juryForSoutenance(soutenanceId: String!): [JuryMember!]!
+  prerequisDossierForDoctorant(doctorantId: ID!): PrerequisDossier
   prerequisConfigForDoctorant(doctorantId: ID!): PrerequisSoutenanceConfig
 }
 
@@ -150,6 +175,10 @@ type Mutation {
   directeurProposePlanification(id: ID!, input: PlanificationInput!): Soutenance!
   adminPlanifySoutenance(id: ID!, input: PlanificationInput!): Soutenance!
   adminMarkSoutenanceDone(id: ID!, dateEffective: String): Soutenance!
+
+   savePrerequisDossier(input: PrerequisDossierInput!): PrerequisDossier!
+   directeurValidePrerequisDossier(doctorantId: ID!, valide: Boolean!, commentaire: String): PrerequisDossier!
+   adminValidePrerequisDossier(doctorantId: ID!, valide: Boolean!, commentaire: String): PrerequisDossier!
   savePrerequisConfig(input: PrerequisConfigInput!): PrerequisSoutenanceConfig!
 }
 

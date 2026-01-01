@@ -4,6 +4,7 @@ import com.exemple.soutenanceservice.model.*;
 import com.exemple.soutenanceservice.repository.JuryMemberRepository;
 import com.exemple.soutenanceservice.repository.SoutenanceRepository;
 import com.exemple.soutenanceservice.repository.PrerequisSoutenanceConfigRepository;
+import com.exemple.soutenanceservice.repository.PrerequisDossierRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -30,6 +31,7 @@ public class SoutenanceDomainService {
     private final SoutenanceRepository soutenanceRepository;
     private final JuryMemberRepository juryMemberRepository;
     private final PrerequisSoutenanceConfigRepository prerequisConfigRepository;
+    private final PrerequisDossierRepository prerequisDossierRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
@@ -84,6 +86,75 @@ public class SoutenanceDomainService {
                         .build());
     }
 
+    public PrerequisDossier getPrerequisDossier(String doctorantId) {
+        if (doctorantId == null || doctorantId.isBlank()) {
+            return null;
+        }
+        return prerequisDossierRepository.findById(doctorantId).orElse(null);
+    }
+
+    @Transactional
+    public PrerequisDossier savePrerequisDossier(PrerequisDossierInput input) {
+        if (input == null || input.getDoctorantId() == null || input.getDoctorantId().isBlank()) {
+            throw new IllegalArgumentException("doctorantId is required");
+        }
+        PrerequisDossier existing = prerequisDossierRepository.findById(input.getDoctorantId())
+                .orElseGet(() -> PrerequisDossier.builder()
+                        .doctorantId(input.getDoctorantId())
+                        .build());
+
+        existing.setPublicationsCount(input.getPublicationsCount());
+        existing.setCommunicationsCount(input.getCommunicationsCount());
+        existing.setHeuresFormationCumulees(input.getHeuresFormationCumulees());
+        existing.setDureeDoctoratAnnees(input.getDureeDoctoratAnnees());
+
+        existing.setEtatScientifique(PrerequisDossierEtat.EN_ATTENTE);
+        existing.setEtatAdministratif(PrerequisDossierEtat.EN_ATTENTE);
+        existing.setCommentaireScientifique(null);
+        existing.setCommentaireAdministratif(null);
+        existing.setDateValidationScientifique(null);
+        existing.setDateValidationAdministratif(null);
+
+        return prerequisDossierRepository.save(existing);
+    }
+
+    @Transactional
+    public PrerequisDossier directeurValidePrerequisDossier(String doctorantId, boolean valide, String commentaire) {
+        if (doctorantId == null || doctorantId.isBlank()) {
+            throw new IllegalArgumentException("doctorantId is required");
+        }
+        PrerequisDossier dossier = prerequisDossierRepository.findById(doctorantId)
+                .orElseThrow(() -> new IllegalStateException("Dossier de prérequis introuvable pour le doctorant"));
+
+        dossier.setEtatScientifique(valide ? PrerequisDossierEtat.VALIDE : PrerequisDossierEtat.REFUSE);
+        dossier.setCommentaireScientifique(commentaire);
+        dossier.setDateValidationScientifique(LocalDateTime.now());
+
+        return prerequisDossierRepository.save(dossier);
+    }
+
+    @Transactional
+    public PrerequisDossier adminValidePrerequisDossier(String doctorantId, boolean valide, String commentaire) {
+        if (doctorantId == null || doctorantId.isBlank()) {
+            throw new IllegalArgumentException("doctorantId is required");
+        }
+        PrerequisDossier dossier = prerequisDossierRepository.findById(doctorantId)
+                .orElseThrow(() -> new IllegalStateException("Dossier de prérequis introuvable pour le doctorant"));
+
+        if (valide) {
+            String errors = checkQuantitativePrerequis(dossier);
+            if (!errors.isEmpty()) {
+                throw new IllegalStateException("Prérequis quantitatifs non satisfaits : " + errors);
+            }
+        }
+
+        dossier.setEtatAdministratif(valide ? PrerequisDossierEtat.VALIDE : PrerequisDossierEtat.REFUSE);
+        dossier.setCommentaireAdministratif(commentaire);
+        dossier.setDateValidationAdministratif(LocalDateTime.now());
+
+        return prerequisDossierRepository.save(dossier);
+    }
+
     @Transactional
     public PrerequisSoutenanceConfig savePrerequisConfig(PrerequisConfigInput input) {
         if (input == null || input.getDoctorantId() == null || input.getDoctorantId().isBlank()) {
@@ -135,10 +206,6 @@ public class SoutenanceDomainService {
         if (input.getMotsCles() != null) {
             s.setMotsCles(String.join(",", input.getMotsCles()));
         }
-        s.setPublicationsCount(input.getPublicationsCount());
-        s.setCommunicationsCount(input.getCommunicationsCount());
-        s.setHeuresFormationCumulees(input.getHeuresFormationCumulees());
-        s.setDureeDoctoratAnnees(input.getDureeDoctoratAnnees());
         s.setManuscritPath(input.getManuscritPath());
         s.setRapportThesePath(input.getRapportThesePath());
         s.setRapportAntiPlagiatPath(input.getRapportAntiPlagiatPath());
@@ -181,38 +248,31 @@ public class SoutenanceDomainService {
             cfg = prerequisConfigRepository.findByDoctorantId(s.getDoctorantId()).orElse(null);
         }
 
-        int effectiveMinPublications = cfg != null && cfg.getMinPublications() > 0
-                ? cfg.getMinPublications() : minPublications;
-        int effectiveMinCommunications = cfg != null && cfg.getMinCommunications() > 0
-                ? cfg.getMinCommunications() : minCommunications;
-        int effectiveMinHeures = cfg != null && cfg.getMinHeuresFormation() > 0
-                ? cfg.getMinHeuresFormation() : minHeuresFormation;
-        int effectiveMaxDuree = cfg != null && cfg.getMaxDureeAnnees() > 0
-                ? cfg.getMaxDureeAnnees() : maxDureeAnnees;
-
         boolean requireManuscrit = cfg != null ? cfg.isRequireManuscrit() : true;
         boolean requireAntiPlagiat = cfg != null ? cfg.isRequireAntiPlagiat() : true;
         boolean requireAttestations = cfg != null ? cfg.isRequireAttestations() : true;
         boolean requireDemande = cfg != null ? cfg.isRequireDemandeManuscrite() : true;
 
-        if (s.getPublicationsCount() < effectiveMinPublications) {
-            sb.append("au moins ")
-                    .append(effectiveMinPublications)
-                    .append(" publication(s) Q1/Q2; ");
-        }
-        if (s.getCommunicationsCount() < effectiveMinCommunications) {
-            sb.append("au moins ")
-                    .append(effectiveMinCommunications)
-                    .append(" communication(s); ");
-        }
-        if (s.getHeuresFormationCumulees() < effectiveMinHeures) {
-            sb.append(effectiveMinHeures)
-                    .append("h de formation cumulées; ");
-        }
-        if (s.getDureeDoctoratAnnees() > effectiveMaxDuree) {
-            sb.append("durée du doctorat > ")
-                    .append(effectiveMaxDuree)
-                    .append(" ans; ");
+        // Contrôle du dossier de prérequis (quantitatif + états de validation)
+        if (s.getDoctorantId() == null) {
+            sb.append("dossier de prérequis non associé à un doctorant; ");
+        } else {
+            PrerequisDossier dossier = prerequisDossierRepository.findById(s.getDoctorantId()).orElse(null);
+            if (dossier == null) {
+                sb.append("dossier de prérequis non déclaré; ");
+            } else {
+                if (dossier.getEtatScientifique() != PrerequisDossierEtat.VALIDE) {
+                    sb.append("validation scientifique des prérequis non effectuée ou refusée; ");
+                }
+                if (dossier.getEtatAdministratif() != PrerequisDossierEtat.VALIDE) {
+                    sb.append("validation administrative des prérequis non effectuée ou refusée; ");
+                }
+
+                String quantErrors = checkQuantitativePrerequis(dossier);
+                if (!quantErrors.isEmpty()) {
+                    sb.append(quantErrors);
+                }
+            }
         }
         if (requireManuscrit && isBlank(s.getManuscritPath())) {
             sb.append("manuscrit final manquant; ");
@@ -226,6 +286,46 @@ public class SoutenanceDomainService {
         if (requireDemande && isBlank(s.getDemandeManuscritePath())) {
             sb.append("demande manuscrite manquante; ");
         }
+        return sb.toString();
+    }
+
+    private String checkQuantitativePrerequis(PrerequisDossier dossier) {
+        StringBuilder sb = new StringBuilder();
+
+        PrerequisSoutenanceConfig cfg = null;
+        if (dossier.getDoctorantId() != null) {
+            cfg = prerequisConfigRepository.findByDoctorantId(dossier.getDoctorantId()).orElse(null);
+        }
+
+        int effectiveMinPublications = cfg != null && cfg.getMinPublications() > 0
+                ? cfg.getMinPublications() : minPublications;
+        int effectiveMinCommunications = cfg != null && cfg.getMinCommunications() > 0
+                ? cfg.getMinCommunications() : minCommunications;
+        int effectiveMinHeures = cfg != null && cfg.getMinHeuresFormation() > 0
+                ? cfg.getMinHeuresFormation() : minHeuresFormation;
+        int effectiveMaxDuree = cfg != null && cfg.getMaxDureeAnnees() > 0
+                ? cfg.getMaxDureeAnnees() : maxDureeAnnees;
+
+        if (dossier.getPublicationsCount() < effectiveMinPublications) {
+            sb.append("au moins ")
+                    .append(effectiveMinPublications)
+                    .append(" publication(s) Q1/Q2; ");
+        }
+        if (dossier.getCommunicationsCount() < effectiveMinCommunications) {
+            sb.append("au moins ")
+                    .append(effectiveMinCommunications)
+                    .append(" communication(s); ");
+        }
+        if (dossier.getHeuresFormationCumulees() < effectiveMinHeures) {
+            sb.append(effectiveMinHeures)
+                    .append("h de formation cumulées; ");
+        }
+        if (dossier.getDureeDoctoratAnnees() > effectiveMaxDuree) {
+            sb.append("durée du doctorat > ")
+                    .append(effectiveMaxDuree)
+                    .append(" ans; ");
+        }
+
         return sb.toString();
     }
 

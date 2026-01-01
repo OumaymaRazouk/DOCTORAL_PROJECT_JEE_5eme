@@ -4,6 +4,7 @@ import com.exemple.soutenanceservice.model.JuryMember;
 import com.exemple.soutenanceservice.model.Soutenance;
 import com.exemple.soutenanceservice.model.SoutenanceStatus;
 import com.exemple.soutenanceservice.model.PrerequisSoutenanceConfig;
+import com.exemple.soutenanceservice.model.PrerequisDossier;
 import com.exemple.soutenanceservice.repository.JuryMemberRepository;
 import com.exemple.soutenanceservice.service.*;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -57,6 +58,11 @@ public class SoutenanceGraphQLController {
     @QueryMapping
     public PrerequisSoutenanceConfig prerequisConfigForDoctorant(@Argument String doctorantId) {
         return domainService.getPrerequisConfig(doctorantId);
+    }
+
+    @QueryMapping
+    public PrerequisDossier prerequisDossierForDoctorant(@Argument String doctorantId) {
+        return domainService.getPrerequisDossier(doctorantId);
     }
 
     @MutationMapping
@@ -129,6 +135,21 @@ public class SoutenanceGraphQLController {
     @MutationMapping
     public PrerequisSoutenanceConfig savePrerequisConfig(@Argument PrerequisConfigInput input) {
         return domainService.savePrerequisConfig(input);
+    }
+
+    @MutationMapping
+    public PrerequisDossier savePrerequisDossier(@Argument PrerequisDossierInput input) {
+        return domainService.savePrerequisDossier(input);
+    }
+
+    @MutationMapping
+    public PrerequisDossier directeurValidePrerequisDossier(@Argument String doctorantId, @Argument boolean valide, @Argument String commentaire) {
+        return domainService.directeurValidePrerequisDossier(doctorantId, valide, commentaire);
+    }
+
+    @MutationMapping
+    public PrerequisDossier adminValidePrerequisDossier(@Argument String doctorantId, @Argument boolean valide, @Argument String commentaire) {
+        return domainService.adminValidePrerequisDossier(doctorantId, valide, commentaire);
     }
 
     // Champ jury: exposer la liste des membres pour une soutenance
