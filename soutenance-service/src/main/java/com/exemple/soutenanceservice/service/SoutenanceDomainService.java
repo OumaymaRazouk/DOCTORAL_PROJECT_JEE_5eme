@@ -126,6 +126,7 @@ public class SoutenanceDomainService {
         PrerequisDossier dossier = prerequisDossierRepository.findById(doctorantId)
                 .orElseThrow(() -> new IllegalStateException("Dossier de prérequis introuvable pour le doctorant"));
 
+        // Le directeur de thèse donne un avis scientifique (publications, communications)
         dossier.setEtatScientifique(valide ? PrerequisDossierEtat.VALIDE : PrerequisDossierEtat.REFUSE);
         dossier.setCommentaireScientifique(commentaire);
         dossier.setDateValidationScientifique(LocalDateTime.now());
@@ -141,6 +142,7 @@ public class SoutenanceDomainService {
         PrerequisDossier dossier = prerequisDossierRepository.findById(doctorantId)
                 .orElseThrow(() -> new IllegalStateException("Dossier de prérequis introuvable pour le doctorant"));
 
+        // Le personnel administratif vérifie la conformité (heures de formation, pièces justificatives) et valide les prérequis
         if (valide) {
             String errors = checkQuantitativePrerequis(dossier);
             if (!errors.isEmpty()) {
@@ -261,16 +263,19 @@ public class SoutenanceDomainService {
             if (dossier == null) {
                 sb.append("dossier de prérequis non déclaré; ");
             } else {
-                if (dossier.getEtatScientifique() != PrerequisDossierEtat.VALIDE) {
-                    sb.append("validation scientifique des prérequis non effectuée ou refusée; ");
-                }
-                if (dossier.getEtatAdministratif() != PrerequisDossierEtat.VALIDE) {
-                    sb.append("validation administrative des prérequis non effectuée ou refusée; ");
-                }
-
+                // Vérification que les seuils exigés (publications, formations, etc.) sont atteints avant d'aller plus loin
                 String quantErrors = checkQuantitativePrerequis(dossier);
                 if (!quantErrors.isEmpty()) {
                     sb.append(quantErrors);
+                }
+                
+                // Vérification que le directeur de thèse a donné un avis scientifique (publications, communications)
+                if (dossier.getEtatScientifique() != PrerequisDossierEtat.VALIDE) {
+                    sb.append("validation scientifique des prérequis non effectuée ou refusée; ");
+                }
+                // Vérification que le personnel administratif a vérifié la conformité (heures de formation, pièces justificatives) et validé les prérequis
+                if (dossier.getEtatAdministratif() != PrerequisDossierEtat.VALIDE) {
+                    sb.append("validation administrative des prérequis non effectuée ou refusée; ");
                 }
             }
         }
