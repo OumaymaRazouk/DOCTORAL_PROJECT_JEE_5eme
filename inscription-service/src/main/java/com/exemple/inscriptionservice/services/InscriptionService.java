@@ -1,7 +1,9 @@
 package com.exemple.inscriptionservice.services;
 
+import com.exemple.inscriptionservice.clients.NotificationClient;
 import com.exemple.inscriptionservice.clients.UserClient;
 import com.exemple.inscriptionservice.dto.CreateInscriptionRequest;
+import com.exemple.inscriptionservice.dto.EmailNotificationRequest;
 import com.exemple.inscriptionservice.dto.InscriptionDTO;
 import com.exemple.inscriptionservice.dto.UserResponse;
 import com.exemple.inscriptionservice.dto.UserResponseWrapper;
@@ -16,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -41,26 +42,23 @@ public class InscriptionService {
     private static final Logger log = LoggerFactory.getLogger(InscriptionService.class);
 
     private final UserClient userClient;
+    private final NotificationClient notificationClient;
     private final InscriptionRepository repo;
     private final CampaignRepository campaigns;
-    private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
     @Value("${storage.base-path:#{systemProperties['user.home']}/doctoral-uploads}")
     private String storageBasePath;
 
-    @Value("${app.notifications.topic:inscription-events}")
-    private String notificationsTopic;
-
     public InscriptionService(UserClient userClient,
+                             NotificationClient notificationClient,
                              InscriptionRepository repo,
                              CampaignRepository campaigns,
-                             KafkaTemplate<String, String> kafkaTemplate,
                              ObjectMapper objectMapper) {
         this.userClient = userClient;
+        this.notificationClient = notificationClient;
         this.repo = repo;
         this.campaigns = campaigns;
-        this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
     }
 
@@ -548,12 +546,17 @@ public class InscriptionService {
             }
             payload.put("timestamp", System.currentTimeMillis());
             String json = objectMapper.writeValueAsString(payload);
-            kafkaTemplate.send(notificationsTopic, i.getId(), json);
-            if (log.isDebugEnabled()) {
-                log.debug("Evenement Kafka publie: topic={}, key={}, type={}", notificationsTopic, i.getId(), type);
+            log.info("Evenement inscription: key={}, type={}, payload={}", i.getId(), type, json);
+
+            try {
+                String subject = "Inscription - " + type;
+                String body = json;
+                notificationClient.sendEmail(new EmailNotificationRequest(null, subject, body));
+            } catch (Exception e) {
+                log.warn("Echec notification email pour inscription {}: {}", i.getId(), e.getMessage());
             }
         } catch (Exception e) {
-            log.warn("Echec envoi evenement Kafka {} pour inscription {}: {}", type, i.getId(), e.getMessage());
+            log.warn("Echec publication evenement {} pour inscription {}: {}", type, i.getId(), e.getMessage());
         }
     }
 

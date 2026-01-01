@@ -1,5 +1,7 @@
 package com.exemple.soutenanceservice.service;
 
+import com.exemple.soutenanceservice.clients.NotificationClient;
+import com.exemple.soutenanceservice.dto.EmailNotificationRequest;
 import com.exemple.soutenanceservice.model.*;
 import com.exemple.soutenanceservice.repository.JuryMemberRepository;
 import com.exemple.soutenanceservice.repository.SoutenanceRepository;
@@ -10,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +33,7 @@ public class SoutenanceDomainService {
     private final JuryMemberRepository juryMemberRepository;
     private final PrerequisSoutenanceConfigRepository prerequisConfigRepository;
     private final PrerequisDossierRepository prerequisDossierRepository;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final NotificationClient notificationClient;
     private final ObjectMapper objectMapper;
 
     @Value("${soutenance.prereq.min-publications:2}")
@@ -46,9 +47,6 @@ public class SoutenanceDomainService {
 
     @Value("${soutenance.prereq.max-duree-annees:6}")
     private int maxDureeAnnees;
-
-    @Value("${app.notifications.topic:inscription-events}")
-    private String notificationsTopic;
 
     private final Sinks.Many<Soutenance> soutenanceSink =
             Sinks.many().multicast().onBackpressureBuffer();
@@ -517,12 +515,17 @@ public class SoutenanceDomainService {
                 }
                 payload.put("timestamp", System.currentTimeMillis());
                 String json = objectMapper.writeValueAsString(payload);
-                kafkaTemplate.send(notificationsTopic, s.getId(), json);
-                if (log.isDebugEnabled()) {
-                    log.debug("Evenement Kafka publie: topic={}, key={}, type={}", notificationsTopic, s.getId(), "SOUTENANCE_UPDATED");
+                log.info("Evenement soutenance: key={}, payload={}", s.getId(), json);
+
+                try {
+                    String subject = "Soutenance - " + String.valueOf(s.getStatus());
+                    String body = json;
+                    notificationClient.sendEmail(new EmailNotificationRequest(null, subject, body));
+                } catch (Exception e) {
+                    log.warn("Echec notification email pour soutenance {}: {}", s.getId(), e.getMessage());
                 }
             } catch (Exception e) {
-                log.warn("Echec envoi evenement Kafka pour soutenance {}: {}", s.getId(), e.getMessage());
+                log.warn("Echec publication evenement pour soutenance {}: {}", s.getId(), e.getMessage());
             }
         });
     }
