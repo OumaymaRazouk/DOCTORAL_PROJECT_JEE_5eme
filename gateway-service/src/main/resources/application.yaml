@@ -7,3 +7,59 @@ spring:
 
   config:
     import: optional:configserver:http://localhost:8888
+
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: inscription
+          uri: lb://inscription-service
+          predicates:
+            - Path=/inscription/**
+          filters:
+            - StripPrefix=1
+        - id: auth
+          uri: lb://utilisateurs-service
+          predicates:
+            - Path=/auth/**
+        - id: users
+          uri: lb://utilisateurs-service
+          predicates:
+            - Path=/users/**
+          filters:
+            - StripPrefix=1
+        - id: soutenance
+          uri: lb://soutenance-service
+          predicates:
+            - Path=/soutenance/**
+          filters:
+            - StripPrefix=1
+        - id: documents
+          uri: lb://document-service
+          predicates:
+            - Path=/documents/**
+          filters:
+            - StripPrefix=1
+      global-cors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins: "http://localhost:4200"
+            allowed-methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowed-headers: "*"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    gateway:
+      access: read-only
