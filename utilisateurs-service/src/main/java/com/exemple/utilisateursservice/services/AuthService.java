@@ -13,9 +13,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.Year;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -64,6 +66,48 @@ public class AuthService {
     public void logout(String email) {
         var user = userRepository.findByEmail(email).orElse(null);
         if (user!=null) refreshTokenRepository.deleteByUser_Id(user.getId());
+    }
+
+    public Map<String, Object> createDirector(CreateDirectorRequest req) {
+        if (userRepository.existsByEmail(req.getEmail())) throw new IllegalArgumentException("Email already used");
+        var token = UUID.randomUUID().toString();
+        var expires = Instant.now().plusSeconds(48 * 3600);
+        var director = User.builder()
+                .firstName(req.getFirstName())
+                .lastName(req.getLastName())
+                .email(req.getEmail())
+                .password(encoder.encode(UUID.randomUUID().toString()))
+                .enabled(false)
+                .etablissement(req.getEtablissement())
+                .specialite(req.getSpecialite())
+                .activationToken(token)
+                .activationExpiresAt(expires)
+                .roles(Set.of(Role.DIRECTEUR))
+                .build();
+        director = userRepository.save(director);
+        var identifiant = String.format("DIR-%d-%06d", Year.now().getValue(), director.getId());
+        director.setIdentifiant(identifiant);
+        userRepository.save(director);
+        Map<String, Object> res = new HashMap<>();
+        res.put("id", director.getId());
+        res.put("identifiant", identifiant);
+        res.put("email", director.getEmail());
+        res.put("activationToken", token);
+        res.put("activationExpiresAt", expires.toString());
+        return res;
+    }
+
+    public AuthResponse activate(ActivateRequest req) {
+        var u = userRepository.findByActivationToken(req.getToken()).orElseThrow(() -> new IllegalArgumentException("Invalid token"));
+        if (u.getActivationExpiresAt() == null || u.getActivationExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Expired token");
+        }
+        u.setPassword(encoder.encode(req.getNewPassword()));
+        u.setEnabled(true);
+        u.setActivationToken(null);
+        u.setActivationExpiresAt(null);
+        userRepository.save(u);
+        return issueTokens(u);
     }
 
     private AuthResponse issueTokens(User user) {

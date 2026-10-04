@@ -3,6 +3,8 @@ package com.exemple.utilisateursservice.controllers;
 import com.exemple.utilisateursservice.entities.User;
 import com.exemple.utilisateursservice.model.Role;
 import com.exemple.utilisateursservice.repositories.UserRepository;
+import com.exemple.utilisateursservice.services.AuthService;
+import com.exemple.utilisateursservice.dto.CreateDirectorRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -20,8 +23,9 @@ import java.util.Map;
 public class UsersController {
 
     private final UserRepository users;
+    private final AuthService authService;
 
-    public UsersController(UserRepository users) { this.users = users; }
+    public UsersController(UserRepository users, AuthService authService) { this.users = users; this.authService = authService; }
 
     @GetMapping("/me")
     public ResponseEntity<?> me(Authentication auth) {
@@ -120,6 +124,24 @@ public class UsersController {
                 "message", "ROLE_DOCTORANT_GRANTED",
                 "data", dto
         ));
+    }
+
+    @PreAuthorize("hasAnyRole('PERSONNEL_ADMINISTRATIF','SUPERADMIN')")
+    @PostMapping("/admin/directeurs")
+    public ResponseEntity<?> createDirecteur(@RequestBody CreateDirectorRequest req) {
+        try {
+            var result = authService.createDirector(req);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "DIRECTEUR_CREATED",
+                    "data", result
+            ));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", ex.getMessage()
+            ));
+        }
     }
 }
 

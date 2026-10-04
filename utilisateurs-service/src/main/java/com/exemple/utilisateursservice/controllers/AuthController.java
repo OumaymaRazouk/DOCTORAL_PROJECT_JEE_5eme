@@ -32,4 +32,13 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestParam String email) { authService.logout(email); return ResponseEntity.noContent().build(); }
+
+    @PostMapping("/activate")
+    public ResponseEntity<?> activate(@RequestBody @Valid ActivateRequest req) {
+        try {
+            return ResponseEntity.ok(authService.activate(req));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
 }

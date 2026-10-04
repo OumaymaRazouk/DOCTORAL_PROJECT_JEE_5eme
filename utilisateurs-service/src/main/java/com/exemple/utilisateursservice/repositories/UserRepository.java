@@ -15,4 +15,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("select u from User u join u.roles r where r = :role")
     List<User> findAllByRole(@Param("role") Role role);
+
+    Optional<User> findByActivationToken(String activationToken);
 }

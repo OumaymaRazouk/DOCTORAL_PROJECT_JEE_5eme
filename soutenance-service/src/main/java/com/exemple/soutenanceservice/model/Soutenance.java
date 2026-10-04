@@ -78,4 +78,9 @@ public class Soutenance {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    // Getter explicite pour compatibilité de compilation si Lombok n'est pas activé
+    public String getMotsCles() {
+        return this.motsCles;
+    }
 }
